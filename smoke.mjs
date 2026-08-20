@@ -1,4 +1,4 @@
-// Smoke test for dsh-evolve v0.2.0. Run with node22 from the package dir
+// Smoke test for dsh-evolve v0.2.1. Run with node22 from the package dir
 // so bare @deepseek-ai/* imports resolve via its deps:
 //   ~/.local/node22/bin/node smoke.mjs
 // Exercises pure logic + filesystem lifecycle (no live ctx needed). Assertions
@@ -15,7 +15,7 @@ const mkRec = (o) => ({
   tags: o.tags ?? [], scope: o.scope ?? 'user', project: '',
   importance: o.importance ?? 2,
   createdAt: new Date.toISOString, updatedAt: new Date.toISOString,
-  accessedAt: '', accessCount: 0, expiresAt: '', crystallizedAt: '',
+  accessedAt: '', accessCount: 0, injectionCount: 0, expiresAt: '', crystallizedAt: '',
 });
 
 // ── index exports ────────────────────────────────────────────────────────────
@@ -163,6 +163,64 @@ try {
   console.log('OK skills: crystallize->refine(preserve edits,+version,no-dup)->archive(reversible)->restore + ownership guards');
 } finally {
   rmSync(root, { recursive: true, force: true });
+}
+
+
+// ── store: injectionCount is observability-only (must NOT affect ranking) ────
+const { MemoryStore } = await import('./lib/store.js');
+function makeStoreTable {
+  const m = new Map;
+  return {
+    put(k, v) { m.set(k, v); return true; }, get(k) { return m.get(k); },
+    delete(k) { return m.delete(k); }, entries { return [...m.entries]; },
+    get size { return m.size; },
+  };
+}
+{
+  const ws = mkdtempSync(join(tmpdir, 'evolve-store-'));
+  try {
+    const st = new MemoryStore(makeStoreTable, { workspaceDir: ws, logger: { warn {}, info {} } });
+    const a = await st.remember({ content: '反代 504 超时默认60秒会导致网关错误', kind: 'lesson', importance: 3, tags: ['t'], confirm: true });
+    const b = await st.remember({ content: '客户投诉先道歉再补发赠品最后折扣码', kind: 'note', importance: 2, tags: ['t'], confirm: true });
+
+    // baseline ranking for a query that matches BOTH
+    const q = '反代 超时';
+    const before = await st.recall(q, 5, { includePending: false });
+    const beforeTop = before[0]?.record.id;
+    const beforeScores = before.map((h) => `${h.record.id}:${h.score.toFixed(4)}`).join(',');
+
+    // hammer injectionCount on record b MANY times
+    for (let i = 0; i < 50; i += 1) st.noteInjection([b.id]);
+    assert.equal(st.effectiveInjectionCount(b), 50, 'effectiveInjectionCount reflects in-memory delta');
+    assert.equal(st.effectiveInjectionCount(a), 0, 'untouched record has 0 injectionCount');
+
+    // ranking MUST be identical — injectionCount must not enter scoreRecord/recencyBoost
+    const after = await st.recall(q, 5, { includePending: false });
+    const afterScores = after.map((h) => `${h.record.id}:${h.score.toFixed(4)}`).join(',');
+    assert.equal(afterScores, beforeScores, 'injectionCount does NOT change recall ranking/scores');
+    assert.equal(after[0]?.record.id, beforeTop, 'injectionCount does NOT change top hit');
+
+    // flush persists injectionCount but must NOT touch accessedAt/updatedAt (ranking fields)
+    const bBeforeFlush = st.table.get(b.id);
+    await st.flushInjections;
+    const bAfter = st.table.get(b.id);
+    assert.equal(bAfter.injectionCount, 50, 'flush persists injectionCount into the record');
+    assert.equal(bAfter.accessedAt, bBeforeFlush.accessedAt, 'flush does NOT touch accessedAt');
+    assert.equal(bAfter.updatedAt, bBeforeFlush.updatedAt, 'flush does NOT touch updatedAt');
+    assert.equal(st.effectiveInjectionCount(st.table.get(b.id)), 50, 'after flush, a fresh record reads persisted injectionCount (delta drained to 0)');
+
+    // stats: current snapshot, pending queue, top-by-injection
+    await st.remember({ content: '一条待确认记忆', kind: 'note', importance: 1, tags: ['t'] }); // pending
+    const stats = st.stats({ topN: 5 });
+    assert.equal(stats.total, 3, 'stats total counts all records');
+    assert.equal(stats.pending, 1, 'stats counts the pending record');
+    assert.equal(stats.confirmed, 2, 'stats confirmed = total - pending');
+    assert.equal(stats.pendingQueue.length, 1, 'pending queue lists the unconfirmed memory');
+    assert.ok(stats.topByInjection[0]?.id === b.id && stats.topByInjection[0]?.injectionCount === 50, 'stats topByInjection surfaces the most-injected memory');
+    console.log('OK store: injectionCount observability-only (ranking unchanged), lazy flush preserves accessedAt, stats snapshot + pending queue');
+  } finally {
+    rmSync(ws, { recursive: true, force: true });
+  }
 }
 
 console.log('\nALL SMOKE TESTS PASSED');

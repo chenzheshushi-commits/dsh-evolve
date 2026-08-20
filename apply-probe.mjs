@@ -54,10 +54,11 @@ const ctx = {
 const mod = await import('./lib/index.js');
 await mod.apply(ctx, {}); // must NOT throw
 
-// ── assert the full v0.2.0 surface ────────────────────────────────────────────
+// ── assert the full v0.2.1 surface ────────────────────────────────────────────
 const expectTools = [
   'memory_remember', 'memory_recall', 'memory_index', 'memory_confirm', 'memory_forget',
   'crystallize_skill', 'refine_skill', 'skill_curator', 'archive_skill', 'restore_skill',
+  'memory_stats', 'skill_stats',
 ];
 for (const t of expectTools) assert.ok(registered.tools.includes(t), `tool registered: ${t}`);
 assert.equal(registered.tools.length, expectTools.length, `exactly ${expectTools.length} tools (got ${registered.tools.length}: ${registered.tools.join(',')})`);
