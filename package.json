@@ -1,0 +1,33 @@
+{
+  "name": "dsh-evolve",
+  "version": "0.1.0",
+  "description": "Self-evolving memory + skill crystallization for DeepSeek Harness. Structured cross-session memory (Culeot-style, MIT) with deterministic zero-token recall + JSON truth + Markdown mirror + git checkpoints + human-approval gate, plus deterministic skill crystallization that writes SKILL.md into ~/.dsh/skills (loaded/managed by DSH's own skill-filesystem — zero extra tokens).",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "assets"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "comment_deps": "These @deepseek-ai/* are host-provided shared packages. dshmarket's diagnostics.ts (diagnosePackageManifests → inspectKnownHostDependencyDeclarations) ONLY scans the `dependencies` field for its KNOWN_SHARED_HOST_PACKAGES list (cordis, dsh-attachment, dsh-llm, dsh-system-prompt, dsh-tools) and warns 'may shadow host'. Declaring them in devDependencies clears that warning while STILL installing local copies — which ESM import needs, because dsh boots plugins via await import WITHOUT --preserve-symlinks: the profile symlink is realpath'd to this source dir, and module resolution then walks node_modules from HERE. peerDependencies would NOT install copies → ERR_MODULE_NOT_FOUND at boot (verified 2026-08-20). cordis 4.x passes services via runtime ctx (not instanceof), so a local copy is not a real shadow — proven by another local plugin running a different cache's cordis copy against the host with no issue, and by driving apply under the host's real instances (all 7 tools registered).",
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-llm": "^0.1.0-rc.7",
+    "@deepseek-ai/dsh-tools": "^0.1.0-rc.7",
+    "@deepseek-ai/dsh-storage": "^0.1.0-rc.7",
+    "@deepseek-ai/dsh-storage-domain": "^0.1.0-rc.7",
+    "@deepseek-ai/dsh-system-prompt": "^0.1.0-rc.7",
+    "@deepseek-ai/schemastery": "^3.18.1"
+  }
+}

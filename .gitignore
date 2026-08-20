@@ -1,0 +1,12 @@
+node_modules/
+pnpm-lock.yaml
+
+# Internal working docs — not part of the public repo
+HERMES_USAGE.md
+_EVAL_PENDING.md
+
+# Local scratch
+*.log
+*.bak
+*.tmp
+.DS_Store
