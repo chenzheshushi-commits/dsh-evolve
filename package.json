@@ -1,9 +1,12 @@
 {
   "name": "dsh-evolve",
-  "version": "0.1.0",
-  "description": "Self-evolving memory + skill crystallization for DeepSeek Harness. Structured cross-session memory (Culeot-style, MIT) with deterministic zero-token recall + JSON truth + Markdown mirror + git checkpoints + human-approval gate, plus deterministic skill crystallization that writes SKILL.md into ~/.dsh/skills (loaded/managed by DSH's own skill-filesystem — zero extra tokens).",
+  "version": "0.2.0",
+  "description": "Self-evolving memory + skill lifecycle for DeepSeek Harness. Structured cross-session memory (Culeot-style, MIT) with deterministic zero-token recall (bigram-Jaccard fused with FTS5 BM25 via RRF) + JSON truth + Markdown mirror + git checkpoints + human-approval gate. Skills crystallize into SKILL.md, REFINE in place over time (versioned, human-edit-preserving, zero extra LLM), and are curated through a real active→stale→archived lifecycle (reversible archive, never deletes) — all loaded/managed by DSH's own skill-filesystem (zero extra tokens).",
   "type": "module",
   "main": "lib/index.js",
+  "scripts": {
+    "test": "node smoke.mjs && node apply-probe.mjs"
+  },
   "exports": {
     ".": {
       "default": "./lib/index.js"
