@@ -1,5 +1,5 @@
 {
-  "name": "@cz/dsh-evolve",
+  "name": "dsh-evolve",
   "version": "0.4.1",
   "description": "Self-evolving memory + skill lifecycle for DeepSeek Harness. Cross-session memory with zero-token deterministic recall (bigram-Jaccard fused with FTS5 BM25 via RRF), a tiered approval gate, and reinforcement that strengthens what you repeat. Procedural knowledge crystallizes into SKILL.md files that refine in place and are curated through an active-stale-archived lifecycle (reversible archive, pre-op backups, rollback, never deletes). Includes background per-turn review, anti-bloat convergence for both skills and memory, an auto-grown user profile, and a web settings page.",
   "keywords": [
