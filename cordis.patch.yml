@@ -1,0 +1,11 @@
+# @local/dsh-evolve bundle patch — one insert over the profile root.
+# Registers a self-evolving memory + skill-crystallization plugin.
+# storage / storageDomain / systemPrompt / tools all live in the host (dsh-base);
+# this plugin registers its own memory domain, model tools, a memory-protocol
+# system-prompt section, and lifecycle hooks (pre-step recall injection,
+# agent/error -> lesson nudge, turn/end -> git checkpoint + crystallization check).
+# skill CALL/MANAGE/hot-reload are NOT reimplemented — DSH's own
+# dsh-skill-filesystem already watches ~/.dsh/skills; we only WRITE SKILL.md there.
+- insert:
+    - id: evolve
+      name: '@local/dsh-evolve'
