@@ -21,6 +21,23 @@ interface ModelRow { provider: string; model: string }
 interface PendingRow { id: string; kind: string; importance: number; content: string }
 interface InjRow { id: string; kind: string; importance: number; injectionCount: number; content: string }
 interface TriageSkill { loaded: number; succeeded: number; errored: number }
+interface PruneMemCand {
+  entityType: 'memory'; id: string; kind?: string; importance: number
+  heat?: number; injectionCount?: number; observationCount?: number
+  pinned: boolean; protectedKind: boolean; reason: string
+  allowedActions: string[]; etag: string | null; content: string
+}
+interface PruneSkillCand { entityType: 'skill'; kind: string; names: string[]; similarity?: number; zeroLoadCount?: number; allowedActions: string[] }
+interface ProtectedRow { id: string; kind: string; importance: number; content: string }
+interface ForgottenRow { id: string; kind: string; content: string }
+interface PruneState {
+  ok: boolean
+  budget: { enabled: boolean; used?: number; max?: number; overBudget?: boolean }
+  memoryCandidates: PruneMemCand[]
+  protectedReview: ProtectedRow[]
+  skillCandidates: PruneSkillCand[]
+  forgotten: ForgottenRow[]
+}
 interface EvolveState {
   ok: boolean
   config: { refineLLM: boolean; refineProvider: string; refineModel: string; tier1Enabled: boolean }
@@ -91,6 +108,54 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
       await refresh()
     } catch (e) { setNote(String(e)) } finally { setSaving(false) }
   }, [refresh])
+
+  // ── v0.4.2 controlled prune ──
+  const [prune, setPrune] = useState<PruneState | null>(null)
+  const [selMem, setSelMem] = useState<Record<string, boolean>>({})
+  const [preview, setPreview] = useState<{ planDigest: string; preview: Array<{ action: string; count: number; allowed: boolean; reason: string; requires?: string }> } | null>(null)
+
+  const refreshPrune = useCallback(async () => {
+    try { setPrune(await apiGet<PruneState>(`${API}/prune`)) } catch (e) { /* keep last */ }
+  }, [])
+  useEffect(() => { void refreshPrune(); const t = window.setInterval(() => { void refreshPrune() }, 8000); return () => window.clearInterval(t) }, [refreshPrune])
+
+  const toggleMem = useCallback((id: string) => { setSelMem((m) => ({ ...m, [id]: !m[id] })) }, [])
+
+  // Stage 1: preview the selected forgets (read-only, gets a planDigest).
+  const doPreview = useCallback(async () => {
+    if (!prune) return
+    const ids = prune.memoryCandidates.filter((c) => selMem[c.id] && c.allowedActions.includes('memory-forget')).map((c) => c.id)
+    if (ids.length === 0) { setNote('未选择可处理的记忆'); return }
+    setSaving(true); setNote('')
+    try {
+      const r = await apiPost<typeof preview>(`${API}/prune/preview`, { selection: { decisions: [{ action: 'memory-forget', entityType: 'memory', memoryIds: ids, reason: 'panel prune' }] } })
+      setPreview(r)
+    } catch (e) { setNote(String(e)) } finally { setSaving(false) }
+  }, [prune, selMem])
+
+  // Stage 2: execute the previewed plan (idempotent via planDigest).
+  const doExecute = useCallback(async () => {
+    if (!preview?.planDigest) return
+    setSaving(true); setNote('')
+    try {
+      const r = await apiPost<{ status: string; applied?: unknown[]; skipped?: Array<{ target: string; reason: string }> }>(`${API}/prune/execute`, { planDigest: preview.planDigest })
+      if (r.status === 'plan-expired') setNote('计划已过期，请重新预览')
+      else setNote(`✅ 处理完成：软删 ${r.applied?.length ?? 0} 条${(r.skipped?.length ?? 0) > 0 ? `，跳过 ${r.skipped!.length} 条（${r.skipped!.map((s) => `${s.target}:${s.reason}`).join('; ')}）` : ''}`)
+      setPreview(null); setSelMem({})
+      await refreshPrune(); await refresh()
+    } catch (e) { setNote(String(e)) } finally { setSaving(false) }
+  }, [preview, refreshPrune, refresh])
+
+  const doRestore = useCallback(async (id: string) => {
+    setSaving(true); setNote('')
+    try {
+      const r = await apiPost<typeof preview>(`${API}/prune/preview`, { selection: { decisions: [{ action: 'memory-restore', entityType: 'memory', memoryIds: [id], reason: 'restore' }] } })
+      // restore goes straight through (reversible, low-risk) — reuse execute
+      if (r?.planDigest) await apiPost(`${API}/prune/execute`, { planDigest: r.planDigest })
+      setNote('✅ 已恢复')
+      await refreshPrune(); await refresh()
+    } catch (e) { setNote(String(e)) } finally { setSaving(false) }
+  }, [refreshPrune, refresh])
 
   const s = state
   const cfg = s?.config
@@ -169,6 +234,104 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
             </button>
           </>
         ) : <div style={{ ...dim, marginTop: 8 }}>（无待确认记忆）</div>}
+      </div>
+
+      {/* ── Block 2.5: Controlled prune (v0.4.2) ── */}
+      <div style={box}>
+        <b>受控剪枝</b>
+        <div style={dim}>检测自动、处置显式。冷/低价值记忆与冗余技能在这里由你勾选处理，全部可逆（软删/归档，随时恢复）。</div>
+
+        {/* budget bar */}
+        {prune?.budget?.enabled ? (
+          <div style={{ ...mono, marginTop: 8, color: prune.budget.overBudget ? '#dc2626' : undefined }}>
+            字符预算：已用 {prune.budget.used} / 上限 {prune.budget.max}{prune.budget.overBudget ? '（超限）' : ''}
+          </div>
+        ) : null}
+
+        {/* memory candidates (checkbox + heat badges) */}
+        <div style={{ marginTop: 10 }}><b style={{ fontSize: 13 }}>待清理记忆</b></div>
+        {prune && prune.memoryCandidates.length > 0 ? (
+          <table style={{ width: '100%', marginTop: 6, ...mono }}>
+            <tbody>
+              {prune.memoryCandidates.map((c) => {
+                const canForget = c.allowedActions.includes('memory-forget')
+                return (
+                  <tr key={c.id}>
+                    <td style={{ width: 24, verticalAlign: 'top' }}>
+                      <input type="checkbox" checked={!!selMem[c.id]} disabled={!canForget || saving} onChange={() => toggleMem(c.id)} />
+                    </td>
+                    <td>
+                      <div>{c.content}</div>
+                      <div style={{ ...dim, fontSize: 11 }}>
+                        {c.pinned ? <span style={{ color: '#f59e0b' }}>PINNED </span> : null}
+                        {c.kind ? `[${c.kind}/imp${c.importance}] ` : ''}
+                        {typeof c.heat === 'number' ? `久未主动访问 · heat ${c.heat}` : ''}
+                        {typeof c.injectionCount === 'number' ? ` · 自动注入 ${c.injectionCount} 次` : ''}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        ) : <div style={{ ...dim, marginTop: 6 }}>（无待清理候选）</div>}
+
+        {/* preview -> execute two-stage */}
+        {prune && prune.memoryCandidates.length > 0 ? (
+          <div style={{ marginTop: 10 }}>
+            {!preview ? (
+              <button style={btn} disabled={saving} onClick={() => void doPreview()}>预览将处理的记忆</button>
+            ) : (
+              <div style={{ border: '1px dashed var(--dsh-border,#555)', borderRadius: 6, padding: 8 }}>
+                <div style={{ marginBottom: 6 }}>预览：</div>
+                {preview.preview.map((p, i) => (
+                  <div key={i} style={mono}>· {p.action} × {p.count}｜{p.allowed ? '将执行' : `跳过（${p.reason}）`}{p.requires ? `（需 ${p.requires}）` : ''}（软删，可恢复）</div>
+                ))}
+                <div style={{ marginTop: 8 }}>
+                  <button style={btnPrimary} disabled={saving} onClick={() => void doExecute()}>确认执行</button>
+                  <button style={btn} disabled={saving} onClick={() => setPreview(null)}>取消</button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : null}
+
+        {/* protected-kind review area (read-only, no forget) */}
+        {prune && prune.protectedReview.length > 0 ? (
+          <div style={{ marginTop: 12 }}>
+            <b style={{ fontSize: 13 }}>保护记录（需专项审阅）</b>
+            <div style={dim}>偏好 / 决策类记忆本版本不支持直接处置（避免误删长期偏好）。仅供审阅。</div>
+            {prune.protectedReview.map((r) => (
+              <div key={r.id} style={{ ...mono, paddingLeft: 12, opacity: 0.8 }}>· [{r.kind}] {r.content}</div>
+            ))}
+          </div>
+        ) : null}
+
+        {/* skill merge candidates */}
+        {prune && prune.skillCandidates.length > 0 ? (
+          <div style={{ marginTop: 12 }}>
+            <b style={{ fontSize: 13 }}>待收敛技能</b>
+            {prune.skillCandidates.map((sc, i) => (
+              <div key={i} style={{ ...mono, paddingLeft: 12, opacity: 0.85 }}>
+                · {sc.names.join(' ↔ ')}｜相似度 {sc.similarity}{typeof sc.zeroLoadCount === 'number' ? `｜零加载 ${sc.zeroLoadCount}` : ''}
+              </div>
+            ))}
+            <div style={{ ...dim, fontSize: 11, marginTop: 4 }}>技能合并/归档请用对话侧 converge_skill / archive_skill（面板暂只做记忆清理）。</div>
+          </div>
+        ) : null}
+
+        {/* forgotten (recoverable) */}
+        {prune && prune.forgotten.length > 0 ? (
+          <div style={{ marginTop: 12 }}>
+            <b style={{ fontSize: 13 }}>已忘记（可恢复）</b>
+            {prune.forgotten.map((r) => (
+              <div key={r.id} style={{ ...mono, paddingLeft: 12 }}>
+                <span style={{ opacity: 0.7 }}>· [{r.kind}] {r.content}</span>
+                <button style={{ ...btn, marginLeft: 8, padding: '2px 8px' }} disabled={saving} onClick={() => void doRestore(r.id)}>恢复</button>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {/* ── Block 3: Overview ── */}
