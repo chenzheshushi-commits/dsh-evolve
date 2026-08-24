@@ -786,6 +786,18 @@ function makeStoreTable() {
   assert.ok(res.applied.length === 1 && res.applied[0].target === 'm1', 'applyPlan: fresh target applied');
   assert.ok(res.skipped.length === 1 && res.skipped[0].target === 'm2' && res.skipped[0].reason === 'stale-target', 'applyPlan: stale target skipped with reason, rest still applied');
 
+  // currentEtag throwing must NOT bubble out of applyPlan (would leave a pending
+  // zombie in the registry). It's caught -> treated as not-found -> skipped.
+  {
+    const planT = buildPlan([{ action: 'memory-forget', entityType: 'memory', targets: [{ id: 'boom', etag: 'e' }], reason: 'x' }]);
+    const throwingEtag = () => { throw new Error('etag resolver blew up'); };
+    let threw = false; let out;
+    try { out = await applyPlan(planT, { 'memory-forget': async () => ({ ok: 1 }) }, throwingEtag); }
+    catch { threw = true; }
+    assert.equal(threw, false, 'applyPlan: a throwing currentEtag does NOT bubble out');
+    assert.ok(out.skipped.length === 1 && out.skipped[0].reason === 'not-found', 'applyPlan: throwing etag -> target skipped as not-found');
+  }
+
   // audit fail-open: unwritable path must NOT throw
   const wsA = mkdtempSync(join(tmpdir(), 'evolve-audit-'));
   try {
