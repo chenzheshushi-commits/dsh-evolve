@@ -474,6 +474,29 @@ function makeStoreTable() {
     assert.equal(rs.restored, 1, 'restoreForgotten clears tombstone');
     assert.ok(st.confirmed().some((r) => r.id === x.id), 'restored record back in confirmed()');
 
+    // (16) restore x PINNED combo: soft-delete a pinned record, restore it ->
+    // pinned flag survives the round-trip AND the record is protected again.
+    const pin = await st.remember({ content: '钉住的运维铁律占位内容', kind: 'lesson', importance: 2, tags: ['ops'], confirm: true });
+    await st.table.put(pin.id, { ...st.table.get(pin.id), pinned: true });
+    await st.softForget(pin.id, true); // pinned needs confirm
+    assert.ok(st.table.get(pin.id).forgottenAt, 'pinned record soft-deleted (with confirm)');
+    const rp = await st.restoreForgotten(pin.id);
+    assert.equal(rp.restored, 1, 'restore pinned record ok');
+    assert.equal(st.table.get(pin.id).pinned, true, 'restore x pinned: pinned flag preserved across round-trip');
+    // still protected after restore: forget without confirm is refused
+    assert.equal((await st.forget(pin.id)).skippedPinned, 1, 'restore x pinned: still pinned-protected after restore');
+
+    // (17) restore x PENDING combo: a pending (unconfirmed) record that gets
+    // soft-deleted then restored must return to PENDING (needs approval), NOT
+    // silently become confirmed/auto-injected. confirmed() excludes both flags.
+    const pend = await st.remember({ content: '一条未确认就被软删的记忆占位', kind: 'note', importance: 1 }); // no confirm -> pending
+    assert.ok(!st.confirmed().some((r) => r.id === pend.id), 'pending record not in confirmed() before');
+    await st.softForget(pend.id);
+    const rpend = await st.restoreForgotten(pend.id);
+    assert.equal(rpend.restored, 1, 'restore pending record ok');
+    assert.ok(st.table.get(pend.id).tags.includes('pending') || !st.confirmed().some((r) => r.id === pend.id), 'restore x pending: restored record still needs approval (not auto-confirmed)');
+    assert.ok(!st.confirmed().some((r) => r.id === pend.id), 'restore x pending: NOT auto-injected (still excluded from confirmed)');
+
     // (9) memory-black-hole entry 1 (reinforcement loop): re-remember near-dup of a
     // TOMBSTONED record -> new record, tombstone untouched (not reinforced/revived)
     await st.softForget(x.id);
