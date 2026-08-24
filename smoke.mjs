@@ -1,4 +1,4 @@
-// Smoke test for @local/dsh-evolve v0.3.0. Run with node22 from the package dir
+// Smoke test for dsh-evolve v0.3.0. Run with node22 from the package dir
 // so bare @deepseek-ai/* imports resolve via its deps:
 //   ~/.local/node22/bin/node smoke.mjs
 // Exercises pure logic + filesystem lifecycle (no live ctx needed). Assertions
@@ -441,6 +441,103 @@ function makeStoreTable() {
     assert.equal(stats.pendingQueue.length, 1, 'pending queue lists the unconfirmed memory');
     assert.ok(stats.topByInjection[0]?.id === b.id && stats.topByInjection[0]?.injectionCount === 50, 'stats topByInjection surfaces the most-injected memory');
     console.log('OK store: injectionCount observability-only (ranking unchanged), lazy flush preserves accessedAt, stats snapshot + pending queue');
+  } finally {
+    rmSync(ws, { recursive: true, force: true });
+  }
+}
+
+
+// ── v0.4.2: soft-delete / pinned / memory-black-hole guards ─────────────────
+{
+  const ws = mkdtempSync(join(tmpdir(), 'evolve-softdel-'));
+  try {
+    const st = new MemoryStore(makeStoreTable(), { workspaceDir: ws, logger: { warn() {}, info() {} } });
+    // seed a confirmed record
+    const x = await st.remember({ content: '部署前务必备份数据库到异地', kind: 'lesson', importance: 2, tags: ['ops'], confirm: true });
+
+    // (1) softForget: record stays in all() but leaves confirmed/recall/tier1/evidence
+    const sf = await st.softForget(x.id);
+    assert.equal(sf.softDeleted, 1, 'softForget stamps tombstone');
+    assert.ok(st.all().some((r) => r.id === x.id), 'soft-deleted record still physically present in all()');
+    assert.ok(!st.confirmed().some((r) => r.id === x.id), 'soft-deleted excluded from confirmed()');
+    const rec1 = await st.recall('备份 数据库', 5, { includePending: false });
+    assert.ok(!rec1.some((h) => h.record.id === x.id), 'soft-deleted excluded from recall');
+    const ev = st.crystallizationEvidence(['lesson', 'decision'], 1);
+    assert.ok(!ev.some((g) => g.records.some((r) => r.id === x.id)), 'soft-deleted excluded from crystallization evidence');
+    // (3) softForget does not change importance/observationCount (only tombstone)
+    const raw = st.table.get(x.id);
+    assert.equal(raw.importance, 2, 'softForget does not change importance');
+    assert.ok(raw.forgottenAt !== '', 'softForget set forgottenAt');
+
+    // (2) restore -> fully recallable again
+    const rs = await st.restoreForgotten(x.id);
+    assert.equal(rs.restored, 1, 'restoreForgotten clears tombstone');
+    assert.ok(st.confirmed().some((r) => r.id === x.id), 'restored record back in confirmed()');
+
+    // (9) memory-black-hole entry 1 (reinforcement loop): re-remember near-dup of a
+    // TOMBSTONED record -> new record, tombstone untouched (not reinforced/revived)
+    await st.softForget(x.id);
+    const tomb = st.table.get(x.id);
+    const y = await st.remember({ content: '部署前务必备份数据库到异地机房', kind: 'lesson', importance: 2, tags: ['ops'], confirm: true });
+    assert.notEqual(y.id, x.id, 'black-hole guard1: near-dup of tombstone creates a NEW record');
+    const tombAfter = st.table.get(x.id);
+    assert.equal(tombAfter.observationCount, tomb.observationCount, 'black-hole: tombstone observationCount unchanged');
+    assert.equal(tombAfter.importance, tomb.importance, 'black-hole: tombstone importance unchanged');
+    assert.equal(tombAfter.updatedAt, tomb.updatedAt, 'black-hole: tombstone updatedAt unchanged');
+    assert.ok(tombAfter.forgottenAt !== '', 'black-hole: tombstone stays forgotten (not revived)');
+
+    // (11) memory-black-hole entry 2 (assessWrite quality gate): near-dup of a
+    // tombstone must NOT be judged near-duplicate (would silently block the write).
+    // Use an isolated store so the ONLY near-neighbor is the tombstone itself.
+    {
+      const stAW = new MemoryStore(makeStoreTable(), { workspaceDir: ws, logger: { warn() {}, info() {} } });
+      const g = await stAW.remember({ content: '网关超时排查先看反代日志再看后端', kind: 'lesson', importance: 2, tags: ['ops'], confirm: true });
+      await stAW.softForget(g.id); // only copy of this content is now a tombstone
+      const aw = stAW.assessWrite({ content: '网关超时排查先看反代日志再看后端', kind: 'lesson', scope: 'project' });
+      assert.notEqual(aw.verdict, 'near-duplicate', 'assessWrite: near-dup of a tombstone is NOT blocked (verdict!=near-duplicate)');
+    }
+
+    // (13) pinned write-protection (reinforcement): pin a record, re-remember near-dup
+    // -> new record; pinned record's fields all unchanged
+    const p = await st.remember({ content: '生产库测写操作绝不拿真实记录当样本', kind: 'lesson', importance: 3, tags: ['safety'], confirm: true });
+    await st.table.put(p.id, { ...st.table.get(p.id), pinned: true });
+    const pinnedBefore = st.table.get(p.id);
+    const z = await st.remember({ content: '生产库测写操作绝不拿真实记录当样本啊', kind: 'lesson', importance: 3, tags: ['safety'], confirm: true });
+    assert.notEqual(z.id, p.id, 'pinned write-protect: near-dup of pinned creates a NEW record (not reinforced into it)');
+    const pinnedAfter = st.table.get(p.id);
+    assert.equal(pinnedAfter.content, pinnedBefore.content, 'pinned: content unchanged');
+    assert.equal(pinnedAfter.importance, pinnedBefore.importance, 'pinned: importance unchanged');
+    assert.equal(pinnedAfter.observationCount, pinnedBefore.observationCount, 'pinned: observationCount unchanged');
+    assert.equal(pinnedAfter.updatedAt, pinnedBefore.updatedAt, 'pinned: updatedAt unchanged');
+
+    // (14) pinned delete-protection at DATA layer (bypasses panel authz)
+    const d1 = await st.forget(p.id); // no confirm
+    assert.equal(d1.skippedPinned, 1, 'pinned forget without confirm -> skippedPinned');
+    assert.ok(st.table.get(p.id), 'pinned record NOT physically deleted');
+    const d2 = await st.forget(p.id, true); // confirm
+    assert.equal(d2.deleted, 1, 'pinned forget WITH confirm=true deletes');
+
+    // (15) pinned soft-delete guard
+    const p2 = await st.remember({ content: '另一条受保护记忆内容占位', kind: 'note', importance: 2, tags: ['x'], confirm: true });
+    await st.table.put(p2.id, { ...st.table.get(p2.id), pinned: true });
+    const s1 = await st.softForget(p2.id); // no confirm
+    assert.equal(s1.skippedPinned, 1, 'pinned softForget without confirmSoft -> skippedPinned');
+    assert.ok(!st.table.get(p2.id).forgottenAt, 'pinned record NOT tombstoned without confirm');
+    const s2 = await st.softForget(p2.id, true);
+    assert.equal(s2.softDeleted, 1, 'pinned softForget WITH confirmSoft=true tombstones');
+
+    // (10) stats: total/byKind exclude tombstones, forgotten counted separately
+    const st2 = new MemoryStore(makeStoreTable(), { workspaceDir: ws, logger: { warn() {}, info() {} } });
+    const m1 = await st2.remember({ content: '活跃记忆一', kind: 'note', importance: 2, tags: ['t'], confirm: true });
+    await st2.remember({ content: '活跃记忆二', kind: 'fact', importance: 2, tags: ['t'], confirm: true });
+    await st2.softForget(m1.id);
+    const s = st2.stats();
+    assert.equal(s.total, 1, 'stats.total excludes tombstones');
+    assert.equal(s.forgotten, 1, 'stats.forgotten counts tombstones separately');
+    assert.equal(s.byKind.note ?? 0, 0, 'stats.byKind excludes tombstoned note');
+    assert.equal(s.byKind.fact, 1, 'stats.byKind counts live fact');
+
+    console.log('OK v0.4.2 store: soft-delete/restore, memory-black-hole guards (reinforce+assessWrite), pinned write/delete/softdelete protection, stats excludes tombstones');
   } finally {
     rmSync(ws, { recursive: true, force: true });
   }
