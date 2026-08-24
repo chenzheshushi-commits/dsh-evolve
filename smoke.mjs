@@ -641,4 +641,151 @@ function makeStoreTable() {
   } finally { rmSync(ws3, { recursive: true, force: true }); }
 }
 
+
+// ── v0.4.2: heat (read-only time-coldness, memory + skill) ──────────────────
+{
+  const { memoryHeat, skillHeat, annotateHeat } = await import('./lib/heat.js');
+  const { MEMORY_DEFAULTS } = await import('./lib/spec.js');
+  const now = Date.parse('2026-08-24T00:00:00Z');
+  const cfg = MEMORY_DEFAULTS;
+  const fresh = { kind: 'note', createdAt: '2026-08-23T00:00:00Z', accessedAt: '2026-08-23T00:00:00Z' };
+  const old = { kind: 'note', createdAt: '2026-01-01T00:00:00Z', accessedAt: '2026-01-01T00:00:00Z' };
+  assert.ok(memoryHeat(fresh, cfg, now) > memoryHeat(old, cfg, now), 'heat: older same-kind = lower heat');
+  // read-only: does not mutate input
+  const before = JSON.stringify(fresh);
+  memoryHeat(fresh, cfg, now);
+  assert.equal(JSON.stringify(fresh), before, 'heat: computation is read-only (input unchanged)');
+  // accessedAt missing -> falls back to createdAt (NOT updatedAt)
+  const noAccess = { kind: 'note', createdAt: '2026-08-23T00:00:00Z', updatedAt: '2026-08-24T00:00:00Z' };
+  const withAccess = { kind: 'note', createdAt: '2026-08-23T00:00:00Z', accessedAt: '2026-08-23T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' };
+  assert.ok(Math.abs(memoryHeat(noAccess, cfg, now) - memoryHeat(withAccess, cfg, now)) < 1e-9, 'heat: uses accessedAt||createdAt, never updatedAt');
+  // slower-decaying kinds stay hotter
+  const prefOld = { kind: 'preference', createdAt: '2026-01-01T00:00:00Z' };
+  const noteOld = { kind: 'note', createdAt: '2026-01-01T00:00:00Z' };
+  assert.ok(memoryHeat(prefOld, cfg, now) > memoryHeat(noteOld, cfg, now), 'heat: preference decays slower than note');
+  // skillHeat uses lastActivityAt, no kind
+  const skFresh = skillHeat({ lastActivityAt: '2026-08-23T00:00:00Z' }, cfg, now);
+  const skOld = skillHeat({ lastActivityAt: '2026-01-01T00:00:00Z' }, cfg, now);
+  assert.ok(skFresh > skOld, 'skillHeat: recent activity = hotter');
+  const ann = annotateHeat([fresh], memoryHeat, cfg, now);
+  assert.ok(typeof ann[0]._heat === 'number' && !('_heat' in fresh), 'annotateHeat: shallow copy carries _heat, original untouched');
+  console.log('OK v0.4.2 heat: power-law, accessedAt||createdAt (not updatedAt), per-kind decay, skill heat, read-only');
+}
+
+
+// ── v0.4.2: prune-authz (3-tier protection, separate from adjudicator) ──────
+{
+  const { authorizePruneAction, isProtectedKind } = await import('./lib/prune-authz.js');
+  // pinned -> reject any action
+  assert.equal(authorizePruneAction('memory-forget', { pinned: true, kind: 'note', importance: 1 }).allowed, false, 'authz: pinned memory-forget rejected');
+  assert.equal(authorizePruneAction('memory-promote', { pinned: true, scope: 'project' }).allowed, false, 'authz: pinned promote rejected');
+  // protected kind -> cannot direct-forget, but promote (project) allowed
+  assert.equal(authorizePruneAction('memory-forget', { kind: 'preference', importance: 2 }).allowed, false, 'authz: protected-kind forget rejected');
+  assert.ok(isProtectedKind('decision') && !isProtectedKind('note'), 'authz: protected kinds are preference/decision');
+  // importance-3 ordinary -> allowed but needs explicit confirm
+  const hi = authorizePruneAction('memory-forget', { kind: 'lesson', importance: 3 });
+  assert.ok(hi.allowed && hi.requires === 'explicit-confirm', 'authz: importance-3 forget needs explicit-confirm');
+  // ordinary reversible
+  assert.equal(authorizePruneAction('memory-forget', { kind: 'note', importance: 1 }).allowed, true, 'authz: ordinary forget allowed');
+  // skill-archive only evolve-owned
+  assert.equal(authorizePruneAction('skill-archive', { name: 'x', ownedByEvolve: false }).allowed, false, 'authz: archive non-evolve skill rejected');
+  assert.equal(authorizePruneAction('skill-archive', { name: 'x', ownedByEvolve: true }).allowed, true, 'authz: archive evolve skill allowed');
+  // skill-converge needs >=2 evolve-owned
+  assert.equal(authorizePruneAction('skill-converge', [{ name: 'a', ownedByEvolve: true }]).allowed, false, 'authz: converge needs >=2');
+  assert.equal(authorizePruneAction('skill-converge', [{ name: 'a', ownedByEvolve: true }, { name: 'b', ownedByEvolve: true }]).allowed, true, 'authz: converge 2 evolve skills allowed');
+  // promote only project scope
+  assert.equal(authorizePruneAction('memory-promote', { scope: 'user' }).allowed, false, 'authz: promote non-project rejected');
+  console.log('OK v0.4.2 prune-authz: 3-tier protection, evolve-owned/scope/confirm rules, separate from adjudicator');
+}
+
+
+// ── v0.4.2: prune-plan (registry idempotency, per-target etag, audit fail-open) ─
+{
+  const { buildPlan, PlanRegistry, applyPlan, memoryEtag, skillEtag, appendAudit, readAudit } = await import('./lib/prune-plan.js');
+  // per-target etag changes when a relevant field changes
+  const r = { id: 'm1', updatedAt: 't', importance: 2, observationCount: 1, injectionCount: 0, pinned: false, forgottenAt: '', scope: 'project' };
+  const e1 = memoryEtag(r);
+  assert.equal(memoryEtag({ ...r }), e1, 'etag: stable for same fields');
+  assert.notEqual(memoryEtag({ ...r, pinned: true }), e1, 'etag: changes when pinned changes');
+  assert.notEqual(memoryEtag({ ...r, injectionCount: 5 }), e1, 'etag: changes when injectionCount changes (global rev would miss this)');
+
+  // registry: idempotent replay via consumed flag
+  let clock = 1000;
+  const reg = new PlanRegistry(() => clock);
+  const plan = buildPlan([{ action: 'memory-forget', entityType: 'memory', targets: [{ id: 'm1', etag: e1 }], reason: 'cold' }]);
+  reg.put(plan);
+  assert.equal(reg.lookup(plan.planDigest).status, 'ok', 'registry: fresh plan is ok');
+  reg.markConsumed(plan.planDigest, { applied: 1 });
+  const replay = reg.lookup(plan.planDigest);
+  assert.ok(replay.status === 'retry' && replay.receipt.applied === 1, 'registry: consumed plan returns original receipt (idempotent, no re-exec)');
+  // expiry -> plan-expired
+  clock += 16 * 60 * 1000;
+  assert.equal(reg.lookup(plan.planDigest).status, 'plan-expired', 'registry: expired plan -> plan-expired (requires re-preview)');
+  // unknown digest -> plan-expired (simulates restart)
+  assert.equal(reg.lookup('deadbeef').status, 'plan-expired', 'registry: unknown digest -> plan-expired');
+
+  // applyPlan: stale target skipped, others applied (no whole-plan failure)
+  const store = { m1: { ...r }, m2: { ...r, id: 'm2' } };
+  const plan2 = buildPlan([{ action: 'memory-forget', entityType: 'memory', targets: [
+    { id: 'm1', etag: memoryEtag(store.m1) },
+    { id: 'm2', etag: 'STALE' },
+  ], reason: 'x' }]);
+  const handlers = { 'memory-forget': async (id) => { delete store[id]; return { softDeleted: 1, id }; } };
+  const curEtag = (type, key) => (store[key] ? memoryEtag(store[key]) : null);
+  const res = await applyPlan(plan2, handlers, curEtag);
+  assert.equal(res.status, 'degraded', 'applyPlan: partial => degraded');
+  assert.ok(res.applied.length === 1 && res.applied[0].target === 'm1', 'applyPlan: fresh target applied');
+  assert.ok(res.skipped.length === 1 && res.skipped[0].target === 'm2' && res.skipped[0].reason === 'stale-target', 'applyPlan: stale target skipped with reason, rest still applied');
+
+  // audit fail-open: unwritable path must NOT throw
+  const wsA = mkdtempSync(join(tmpdir(), 'evolve-audit-'));
+  try {
+    appendAudit(wsA, { planDigest: 'p', applied: [], skipped: [] }, {}, { warn() {} });
+    assert.equal(readAudit(wsA).length, 1, 'audit: entry appended + read back');
+    // fail-open: pass a bogus dir; should warn not throw
+    let threw = false;
+    try { appendAudit('/nonexistent-root-xyz/evolve', { planDigest: 'q' }, {}, { warn() {} }); } catch { threw = true; }
+    assert.equal(threw, false, 'audit: unwritable path is fail-open (no throw, prune keeps working)');
+    // ring-trim
+    for (let i = 0; i < 12; i += 1) appendAudit(wsA, { n: i }, { auditMaxRuns: 5 }, { warn() {} });
+    assert.ok(readAudit(wsA).length <= 5, 'audit: ring-trimmed to auditMaxRuns');
+  } finally { rmSync(wsA, { recursive: true, force: true }); }
+  console.log('OK v0.4.2 prune-plan: per-target etag, registry idempotency (retry/plan-expired), stale-skip partial apply, audit fail-open + ring-trim');
+}
+
+
+// ── v0.4.2: idle-trigger (opt-in, unref timer, no polling, read-only) ───────
+{
+  const { createIdleTrigger } = await import('./lib/idle-trigger.js');
+  // default OFF: no timer ever
+  let armedCount = 0;
+  const fakeSet = (fn, ms) => { armedCount += 1; return { unref() {} }; };
+  const fakeClear = () => {};
+  const offTrig = createIdleTrigger({ enabled: false, idleMinutes: 5, onIdle: async () => {}, setTimeoutFn: fakeSet, clearTimeoutFn: fakeClear });
+  offTrig.noteWrite(); offTrig.noteWrite();
+  assert.equal(armedCount, 0, 'idle-trigger: disabled -> never arms a timer');
+  assert.equal(offTrig.isArmed(), false, 'idle-trigger: disabled -> not armed');
+
+  // enabled: each write clears+re-arms; callback is read-only
+  let clears = 0; let sets = 0; let ran = 0;
+  const timers = [];
+  const setFn = (fn, ms) => { sets += 1; const t = { fn, unref() {} }; timers.push(t); return t; };
+  const clearFn = () => { clears += 1; };
+  const onTrig = createIdleTrigger({ enabled: true, idleMinutes: 1, onIdle: async () => { ran += 1; }, setTimeoutFn: setFn, clearTimeoutFn: clearFn });
+  onTrig.noteWrite();
+  assert.ok(onTrig.isArmed() && sets === 1, 'idle-trigger: first write arms');
+  onTrig.noteWrite();
+  assert.ok(clears === 1 && sets === 2, 'idle-trigger: second write clears previous + re-arms');
+  await timers[timers.length - 1].fn();
+  assert.equal(ran, 1, 'idle-trigger: fired callback runs onIdle');
+  // dispose clears pending timer
+  onTrig.noteWrite();
+  const clearsBefore = clears;
+  onTrig.dispose();
+  assert.equal(clears, clearsBefore + 1, 'idle-trigger: dispose clears pending timer');
+  onTrig.noteWrite();
+  assert.equal(onTrig.isArmed(), false, 'idle-trigger: no arming after dispose');
+  console.log('OK v0.4.2 idle-trigger: default-off no timer, opt-in unref re-arm, dispose clears, read-only callback');
+}
+
 console.log('\nALL SMOKE TESTS PASSED');
