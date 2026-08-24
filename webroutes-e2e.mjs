@@ -107,5 +107,70 @@ await store.remember({ content: '一条待确认记忆', kind: 'note', importanc
   console.log('OK web confirm-batch: confirmed 1, pending queue drained');
 }
 
+// ── v0.4.2 prune routes: fence + preview->execute + plan-expired ────────────
+{
+  // build a real prune controller via the exported wiring path is internal to
+  // index.js; here we drive the ROUTE layer with a minimal prune stub that
+  // exercises the contract (list/preview/execute + registry semantics).
+  const { PlanRegistry, buildPlan } = await import('./lib/prune-plan.js');
+  const reg = new PlanRegistry();
+  let executed = 0;
+  const prune = {
+    listCandidates: async () => ({ budget: { enabled: true, used: 10, max: 100, overBudget: false }, memoryCandidates: [{ entityType: 'memory', id: 'm1', allowedActions: ['memory-forget'] }], skillCandidates: [], forgotten: [] }),
+    preview: async (sel) => { const p = buildPlan([{ action: 'memory-forget', entityType: 'memory', targets: [{ id: 'm1', etag: 'e1' }] }]); reg.put(p); return { planDigest: p.planDigest, preview: [{ action: 'memory-forget', count: 1, allowed: true }] }; },
+    execute: async (digest) => { const l = reg.lookup(digest); if (l.status === 'plan-expired') return { status: 'plan-expired' }; if (l.status === 'retry') return { ...l.receipt, status: 'retry' }; executed += 1; const r = { status: 'ok', applied: [{ target: 'm1' }], skipped: [] }; reg.markConsumed(digest, r); return r; },
+  };
+  const routes2 = makeEvolveRoutes({ store, llm, getConfig: () => cfg, setConfig: () => {}, skillStates: () => ({ counts: {}, triage: {} }), prune });
+  const R2 = routeMap(routes2);
+  assert.ok(R2['/api/evolve/prune'] && R2['/api/evolve/prune/preview'] && R2['/api/evolve/prune/execute'], 'prune routes present');
+
+  // GET /prune
+  {
+    const res = mockRes();
+    await R2['/api/evolve/prune'].handler(mockReq({ method: 'GET' }), res);
+    assert.equal(res.statusCode, 200, 'prune list 200');
+    const j = JSON.parse(res.body);
+    assert.ok(j.ok && j.memoryCandidates.length === 1, 'prune list returns candidates');
+  }
+  // fence: non-loopback -> 403
+  {
+    const bad = mockReq({ method: 'GET' }); bad.socket.remoteAddress = '8.8.8.8';
+    const res = mockRes();
+    await R2['/api/evolve/prune'].handler(bad, res);
+    assert.equal(res.statusCode, 403, 'prune list non-loopback -> 403');
+  }
+  // preview -> execute (idempotent replay)
+  let digest;
+  {
+    const res = mockRes();
+    await R2['/api/evolve/prune/preview'].handler(mockReq({ method: 'POST', body: { selection: { decisions: [] } } }), res);
+    assert.equal(res.statusCode, 200, 'preview 200');
+    digest = JSON.parse(res.body).planDigest;
+    assert.ok(digest, 'preview returns planDigest');
+  }
+  {
+    const res = mockRes();
+    await R2['/api/evolve/prune/execute'].handler(mockReq({ method: 'POST', body: { planDigest: digest } }), res);
+    const j = JSON.parse(res.body);
+    assert.equal(j.status, 'ok', 'execute ok');
+    assert.equal(executed, 1, 'execute ran once');
+  }
+  {
+    // replay same digest -> retry (no re-exec, idempotent)
+    const res = mockRes();
+    await R2['/api/evolve/prune/execute'].handler(mockReq({ method: 'POST', body: { planDigest: digest } }), res);
+    const j = JSON.parse(res.body);
+    assert.equal(j.status, 'retry', 'replay -> retry');
+    assert.equal(executed, 1, 'replay did NOT re-execute (idempotent)');
+  }
+  {
+    // unknown digest -> plan-expired
+    const res = mockRes();
+    await R2['/api/evolve/prune/execute'].handler(mockReq({ method: 'POST', body: { planDigest: 'deadbeef' } }), res);
+    assert.equal(JSON.parse(res.body).status, 'plan-expired', 'unknown digest -> plan-expired');
+  }
+  console.log('OK web /prune: fence 403, list candidates, preview->execute, idempotent retry, plan-expired');
+}
+
 rmSync(ws, { recursive: true, force: true });
 console.log('\nWEB-ROUTES E2E PASSED');
