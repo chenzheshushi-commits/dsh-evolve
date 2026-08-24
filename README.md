@@ -188,6 +188,8 @@ behavior on failure. Nothing runs in your main loop.
 
 ---
 
+---
+
 ## What's new in v0.4.2
 
 **The missing half of "self-evolving": the human-facing pruning page.**
@@ -205,6 +207,8 @@ v0.4.0/v0.4.1 gave you the evolution loop (tiered approval, reinforcement, anti-
 A2 layout in the settings page: **approval queue** (existing) at top, then the new **controlled-prune** block (candidates + preview/execute + protected area + forgotten list), then **overview** below. Pinned rows render their checkbox disabled.
 
 Excluded by design: local vector models, semantic search, knowledge graphs. Heat pruning of this plugin is a re-read of dsh-mneme (MIT, attribution in source). All four pure-logic mechanisms adopted — heat, JSONL audit, two-stage preview→execute with registry, idle refresh — were cherry-picked because they add **zero new dependencies** and respect the "detect automatically, dispose explicitly" principle. The community is `chenzheshushi-commits/dsh-evolve` on GitHub; issue reports welcome.
+
+---
 
 ---
 
