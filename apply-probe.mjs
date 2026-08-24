@@ -1,4 +1,4 @@
-// Host-instance apply() probe for @local/dsh-evolve v0.3.0.
+// Host-instance apply() probe for dsh-evolve v0.3.0.
 // Drives apply(ctx, cfg) with a record-only mock ctx that mimics the host's
 // cordis service surface (storageDomain, tools, systemPrompt, llm, on/effect/get),
 // then asserts every tool/section/hook the plugin promises actually registers.
@@ -100,6 +100,11 @@ assert.ok(registered.childPlugins.includes('dsh-evolve-web-routes'), 'web-routes
 assert.ok(registered.childPlugins.includes('dsh-evolve-web-settings'), 'web-settings child plugin declared');
 assert.ok(registered.routes.includes('/api/evolve/state'), 'route /api/evolve/state registered (webServer present)');
 assert.ok(registered.routes.includes('/api/evolve/action'), 'route /api/evolve/action registered (webServer present)');
+// v0.4.2 prune routes
+assert.ok(registered.routes.includes('/api/evolve/prune'), 'route /api/evolve/prune registered');
+assert.ok(registered.routes.includes('/api/evolve/prune/preview'), 'route /api/evolve/prune/preview registered');
+assert.ok(registered.routes.includes('/api/evolve/prune/execute'), 'route /api/evolve/prune/execute registered');
+assert.equal(registered.routes.length, 5, `exactly 5 routes (got ${registered.routes.length})`);
 
 rmSync(home, { recursive: true, force: true });
 console.log('OK apply() probe:');

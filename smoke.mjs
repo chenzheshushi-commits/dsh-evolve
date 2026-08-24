@@ -695,6 +695,8 @@ function makeStoreTable() {
   assert.equal(authorizePruneAction('skill-converge', [{ name: 'a', ownedByEvolve: true }, { name: 'b', ownedByEvolve: true }]).allowed, true, 'authz: converge 2 evolve skills allowed');
   // promote only project scope
   assert.equal(authorizePruneAction('memory-promote', { scope: 'user' }).allowed, false, 'authz: promote non-project rejected');
+  // memory-restore always allowed (reversible)
+  assert.equal(authorizePruneAction('memory-restore', { id: 'x' }).allowed, true, 'authz: memory-restore allowed (reversible)');
   console.log('OK v0.4.2 prune-authz: 3-tier protection, evolve-owned/scope/confirm rules, separate from adjudicator');
 }
 
