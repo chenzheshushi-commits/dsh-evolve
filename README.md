@@ -39,7 +39,7 @@ dsh plugin --profile web add github:chenzheshushi-commits/dsh-evolve
 Pin a specific release instead of tracking `main`:
 
 ```bash
-dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.4.1/dsh-evolve-0.4.1.tgz"
+dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.4.2/dsh-evolve-0.4.2.tgz"
 ```
 
 Then restart the harness — tools are discovered at startup, not hot-reloaded.
@@ -185,6 +185,26 @@ behavior on failure. Nothing runs in your main loop.
 - **No internal timers.** In-session work hangs off events; offline work is an external cron calling a tool.
 - **Ship blank.** No preloaded personal data. What it learns stays on your machine and is never packaged.
 - **Mechanisms over model smarts.** Safety comes from deterministic rules, so swapping models changes quality, never safety.
+
+---
+
+## What's new in v0.4.2
+
+**The missing half of "self-evolving": the human-facing pruning page.**
+
+v0.4.0/v0.4.1 gave you the evolution loop (tiered approval, reinforcement, anti-bloat convergence, background review). v0.4.2 closes the loop on the *human* side — there was previously no UI to act on prune candidates, only back-end tools. You can now prune from the settings page:
+
+- **Soft-delete (reversible).** Forgotten memories get a `forgottenAt` tombstone and disappear from recall / injection / crystallization, but stay in the store until you restore them. The MEMORY.md mirror gets a separate "## Forgotten (recoverable)" section so they never silently mix with active memories.
+- **`pinned` — three-tier protection.** Pin a memory and it is locked from every code path: never enters prune candidates, never overwritten by near-duplicate reinforcement, never deleted without an explicit `confirm=true`. The protection lives in the data layer (one of the two places every delete goes through), so it holds regardless of whether the delete came from the panel, a tool call, or a future code path.
+- **Protected-kind review area.** `preference` and `decision` memories are *not* direct-deleteable — the panel shows them in a read-only "Protected records (special review needed)" section rather than giving a button that does nothing.
+- **Heat is a read-only ordering signal.** Each memory gets a power-law coldness score `H = 1 / (1 + λ·Δt)^α`. Time basis is `accessedAt || createdAt` — **never `updatedAt`** (a dsh-mneme upstream bug we explicitly avoid). Heat only orders prune candidates; it never archives anything automatically.
+- **Two-stage panel: preview → execute.** Stage 1 (`POST /prune/preview`) builds an in-memory plan and returns a `planDigest`. Stage 2 (`POST /prune/execute`) consumes it. The plan registry uses **atomic claim** (synchronous consumed-flag flip *before* the applyPlan `await`) so double-click / retry / resend cannot re-execute — without it, `skill-converge` would create duplicate umbrella skills under load.
+- **Per-target ETag staleness check.** Each target carries the etag it had at preview time. If something else mutates it before execute, that target is skipped (not-found / stale) with a reason; the rest of the plan still applies. No whole-plan failure.
+- **JSONL audit, fail-open + amortized ring-trim.** Every run is appended to `.evolve-audit.jsonl` (500-row cap). The audit write is *fail-open* — a disk error warns, never blocks the prune.
+
+A2 layout in the settings page: **approval queue** (existing) at top, then the new **controlled-prune** block (candidates + preview/execute + protected area + forgotten list), then **overview** below. Pinned rows render their checkbox disabled.
+
+Excluded by design: local vector models, semantic search, knowledge graphs. Heat pruning of this plugin is a re-read of dsh-mneme (MIT, attribution in source). All four pure-logic mechanisms adopted — heat, JSONL audit, two-stage preview→execute with registry, idle refresh — were cherry-picked because they add **zero new dependencies** and respect the "detect automatically, dispose explicitly" principle. The community is `chenzheshushi-commits/dsh-evolve` on GitHub; issue reports welcome.
 
 ---
 
