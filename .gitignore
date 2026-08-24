@@ -10,3 +10,6 @@ _EVAL_PENDING.md
 *.bak
 *.tmp
 .DS_Store
+
+# Internal plans/scratch — never in public repo
+.hermes/
