@@ -819,6 +819,9 @@ function makeStoreTable() {
       const len = readAudit(wsB).length;
       assert.ok(len <= 20 + 4, `audit: amortized trim keeps file bounded (<=maxRuns+checkEvery, got ${len})`);
       assert.ok(len >= 20, `audit: retains at least maxRuns recent entries (got ${len})`);
+      // symmetric read-side tail cap: even if the file transiently overshoots,
+      // readAudit(cfg) never returns more than maxRuns.
+      assert.ok(readAudit(wsB, { auditMaxRuns: 20 }).length <= 20, 'audit: readAudit(cfg) tail-caps to maxRuns');
     } finally { rmSync(wsB, { recursive: true, force: true }); }
   } finally { rmSync(wsA, { recursive: true, force: true }); }
   console.log('OK v0.4.2 prune-plan: per-target etag, registry idempotency (retry/plan-expired), stale-skip partial apply, audit fail-open + ring-trim');
