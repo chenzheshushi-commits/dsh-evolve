@@ -807,9 +807,19 @@ function makeStoreTable() {
     let threw = false;
     try { appendAudit('/nonexistent-root-xyz/evolve', { planDigest: 'q' }, {}, { warn() {} }); } catch { threw = true; }
     assert.equal(threw, false, 'audit: unwritable path is fail-open (no throw, prune keeps working)');
-    // ring-trim
+    // ring-trim (small cap: checkEvery clamps to 1, trims every append)
     for (let i = 0; i < 12; i += 1) appendAudit(wsA, { n: i }, { auditMaxRuns: 5 }, { warn() {} });
-    assert.ok(readAudit(wsA).length <= 5, 'audit: ring-trimmed to auditMaxRuns');
+    assert.ok(readAudit(wsA).length <= 5, 'audit: ring-trimmed to auditMaxRuns (small cap)');
+    // amortized trim: with a larger cap the file may transiently overshoot by up
+    // to one checkEvery window, but stays bounded and converges (never unbounded).
+    const wsB = mkdtempSync(join(tmpdir(), 'evolve-audit2-'));
+    try {
+      // maxRuns=20 -> checkEvery = clamp(floor(20*0.2),1,200) = 4
+      for (let i = 0; i < 200; i += 1) appendAudit(wsB, { n: i }, { auditMaxRuns: 20 }, { warn() {} });
+      const len = readAudit(wsB).length;
+      assert.ok(len <= 20 + 4, `audit: amortized trim keeps file bounded (<=maxRuns+checkEvery, got ${len})`);
+      assert.ok(len >= 20, `audit: retains at least maxRuns recent entries (got ${len})`);
+    } finally { rmSync(wsB, { recursive: true, force: true }); }
   } finally { rmSync(wsA, { recursive: true, force: true }); }
   console.log('OK v0.4.2 prune-plan: per-target etag, registry idempotency (retry/plan-expired), stale-skip partial apply, audit fail-open + ring-trim');
 }
