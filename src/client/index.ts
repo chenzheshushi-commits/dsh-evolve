@@ -1,8 +1,8 @@
 /**
- * @local/dsh-evolve browser half — registers the "dsh-evolve" settings section.
+ * dsh-evolve browser half — registers the "dsh-evolve" settings section.
  * The section component owns its own polling + fetch calls to the host's
  * same-origin /api/evolve/* routes.
- * @module @local/dsh-evolve/client
+ * @module dsh-evolve/client
  */
 
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'

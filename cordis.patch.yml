@@ -1,4 +1,4 @@
-# @local/dsh-evolve bundle patch — one insert over the profile root.
+# dsh-evolve bundle patch — one insert over the profile root.
 # Registers a self-evolving memory + skill-crystallization plugin.
 # storage / storageDomain / systemPrompt / tools all live in the host (dsh-base);
 # this plugin registers its own memory domain, model tools, a memory-protocol
@@ -8,4 +8,4 @@
 # dsh-skill-filesystem already watches ~/.dsh/skills; we only WRITE SKILL.md there.
 - insert:
     - id: evolve
-      name: '@local/dsh-evolve'
+      name: 'dsh-evolve'

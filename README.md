@@ -30,12 +30,21 @@ It never blocks the harness from booting.
 
 ## Install
 
+Straight from this repository — no npm package needed:
+
 ```bash
-# in your DSH profile
-dsh plugin add @cz/dsh-evolve
+dsh plugin --profile web add github:chenzheshushi-commits/dsh-evolve
 ```
 
-Or clone and link for development:
+Pin a specific release instead of tracking `main`:
+
+```bash
+dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.4.1/dsh-evolve-0.4.1.tgz"
+```
+
+Then restart the harness — tools are discovered at startup, not hot-reloaded.
+
+Or clone for development:
 
 ```bash
 git clone https://github.com/chenzheshushi-commits/dsh-evolve.git

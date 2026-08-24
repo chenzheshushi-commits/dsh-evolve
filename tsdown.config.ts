@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsdown'
 
 /**
- * Client-only build for @local/dsh-evolve's web settings section.
+ * Client-only build for dsh-evolve's web settings section.
  *
  * The HOST half of dsh-evolve is hand-written ESM in lib/ (index.js, store.js,
  * skills.js, spec.js, search.js, fts.js, llm-refine.js, web-routes.js) — it

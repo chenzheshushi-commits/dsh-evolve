@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url'
 const root = dirname(dirname(fileURLToPath(import.meta.url)))
 const target = join(root, 'lib', 'client.js')
 /** Module id DSH registers this plugin's browser half under. */
-const MODULE_ID = '@local/dsh-evolve'
+const MODULE_ID = 'dsh-evolve'
 
 const original = readFileSync(target, 'utf8')
 
