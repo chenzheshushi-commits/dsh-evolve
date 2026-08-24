@@ -726,6 +726,30 @@ function makeStoreTable() {
   // unknown digest -> plan-expired (simulates restart)
   assert.equal(reg.lookup('deadbeef').status, 'plan-expired', 'registry: unknown digest -> plan-expired');
 
+  // ⭐ TOCTOU: concurrent execute of the SAME digest must NOT double-execute.
+  // Simulate two requests interleaved around a long `await applyPlan`: request A
+  // claims, then (before A finalizes) request B arrives. B must get 'retry'.
+  {
+    let execCount = 0;
+    const reg2 = new PlanRegistry();
+    const cp = buildPlan([{ action: 'skill-converge', entityType: 'skill', targets: [{ name: 'a', etag: 'x' }, { name: 'b', etag: 'y' }], reason: 'dup' }]);
+    reg2.put(cp);
+    // Model execute() as: claim (sync) -> await work -> finalize.
+    const runExecute = async () => {
+      const look = reg2.lookupAndClaim(cp.planDigest);
+      if (look.status !== 'ok') return look.status;
+      await new Promise((r) => setTimeout(r, 5)); // stand-in for applyPlan (creates umbrella)
+      execCount += 1;
+      reg2.finalize(cp.planDigest, { status: 'ok', applied: [{ target: 'umbrella' }] });
+      return 'ok';
+    };
+    // fire both without awaiting the first — true interleave
+    const [ra, rb] = await Promise.all([runExecute(), runExecute()]);
+    const statuses = [ra, rb].sort().join(',');
+    assert.equal(statuses, 'ok,retry', `TOCTOU: exactly one executes, other gets retry (got ${statuses})`);
+    assert.equal(execCount, 1, `TOCTOU: work body ran exactly ONCE despite concurrent execute (got ${execCount})`);
+  }
+
   // applyPlan: stale target skipped, others applied (no whole-plan failure)
   const store = { m1: { ...r }, m2: { ...r, id: 'm2' } };
   const plan2 = buildPlan([{ action: 'memory-forget', entityType: 'memory', targets: [
