@@ -39,7 +39,7 @@ dsh plugin --profile web add github:chenzheshushi-commits/dsh-evolve
 Pin a specific release instead of tracking `main`:
 
 ```bash
-dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.4.2/dsh-evolve-0.4.2.tgz"
+dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.5.0/dsh-evolve-0.5.0.tgz"
 ```
 
 Then restart the harness — tools are discovered at startup, not hot-reloaded.
@@ -187,6 +187,35 @@ behavior on failure. Nothing runs in your main loop.
 - **Mechanisms over model smarts.** Safety comes from deterministic rules, so swapping models changes quality, never safety.
 
 ---
+
+---
+
+---
+
+## What's new in v0.5.0
+
+**Autonomy becomes a user-chosen dial, and Chinese retrieval is fixed at the root.**
+
+Earlier versions hard-wired how much the memory could decide on its own. v0.5.0 makes that a product setting, on both the ingest and the disposal side — deliberately asymmetric, because an ingestion mistake is an *addition* (visible) while a disposal mistake is a *subtraction* (invisible).
+
+### Ingestion autonomy — `approvalMode` (three tiers)
+- **`manual`** — every model write waits for your confirm. **`balanced`** (default) — reversible writes that are anchored to a literal user utterance *or* near-duplicate of a confirmed memory auto-confirm; everything else is pending. **`autonomous`** — any reversible, non-conflicting write auto-confirms.
+- **`autonomous` still forces conflicts and high-importance (imp 3) memories to pending** — the tier split sits *after* the conflict/importance scan, so it's a structural guarantee, not a fragile `if`.
+- **Bounded so it can't flood the store:** at most `reviewMaxAutoPerTurn` auto-confirms per background-review turn (rest fall to pending), and a hard `maxPendingQueue` cap on the one region that can be losslessly refused. Confirmed memory is char-budget bound, pending is count-bound — neither pool grows without limit.
+- Background review can no longer take the `anchored` auto-confirm shortcut on its own say-so (`anchoredToUser` is caller/store-derived, never model self-report).
+
+### Disposal autonomy — `disposalMode` (two tiers)
+- **`manual`** (default) — nothing proposed automatically. **`suggest`** — when idle, recompute and surface low-value candidates for your review. **Zero auto-deletion in any tier** — heat stays a read-only ordering signal, physical deletion is never automatic; you still act on candidates through the two-stage prune panel.
+- Candidate rule is **objective and non-heat**: never injected *and* never recalled (both channels zero) + past an explicit cool-off (`disposalMinIdleDays`), excluding pinned / protected-kind / pending / recent. **Skills never enter any automatic tier** (fold/archive stay manual). The `tidy` tier (bounded auto soft-delete) is deferred to v0.6.x alongside tombstone GC.
+
+### Retrieval (Chinese recall fixed)
+- **R1/R2 — tokenizer bug fixed.** A greedy `{2,}` regex used to swallow an entire Chinese query into one token, so any multi-word paraphrase scored zero. Now runs match fully or fall back to down-weighted 2-gram fragments (stopword-filtered, capped), with a query-length-adaptive threshold. Recall up, precision held (adversarial false-match set stays at zero).
+- **R3 — tags fold into the FTS index**, bridging part of the synonym gap at zero new dependency. **R5 — retrieval degradation is now visible** (fused vs bigram-only vs fts-degraded) instead of silently dropping quality. **R6 — extended CJK ranges** (Ext-A / Compatibility), verified to cause zero drift in the adjudicator's similarity thresholds on the real store (reproducible via `pnpm run test:baseline`).
+
+### Observability / audit
+- Background review runs land in the JSONL audit. Pending records carry the source-context snippet they were drawn from. The prune preview is tabular.
+
+All new config is conservative by default (`balanced` / `manual`) — existing behavior is unchanged until you opt in via the two new blocks on the settings page.
 
 ---
 
