@@ -44,6 +44,7 @@
   "scripts": {
     "build": "tsdown && node scripts/wrap-client.mjs",
     "test": "node smoke.mjs && node apply-probe.mjs && node webroutes-e2e.mjs",
+    "test:baseline": "node baseline/retrieval-baseline.mjs && node baseline/r6-threshold-drift.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dsh": {

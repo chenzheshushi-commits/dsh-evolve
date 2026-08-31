@@ -934,6 +934,38 @@ function makeStoreTable() {
   } else {
     console.log('OK v0.5.0 R3+R6: extended CJK ranges (FTS5 unavailable — tag-index assertion skipped)');
   }
+
+  // R6 threshold-drift guard (self-contained, no real DB — 评审 A2 复现性).
+  // The OLD range (basic block only) vs the current prod tokenizer must produce
+  // IDENTICAL bigram sets on basic-block text — so the adjudicator's
+  // duplicateSimilarity(0.82)/conflictSimilarity(0.5) distribution can't drift.
+  // (The full real-DB pairwise regression lives in baseline/r6-threshold-drift.mjs.)
+  {
+    const baselineTok = (text) => {
+      const lower = String(text).toLowerCase(); const t = [];
+      const ascii = /[a-z0-9_]+/g; let m;
+      while ((m = ascii.exec(lower)) !== null) t.push(m[0]);
+      for (const run of (lower.match(/[\u4e00-\u9fff]+/g) ?? [])) {
+        if (run.length === 1) t.push(run);
+        else for (let i = 0; i < run.length - 1; i += 1) t.push(run.slice(i, i + 2));
+      }
+      return new Set(t);
+    };
+    const jac = (a, b) => { if (!a.size && !b.size) return 0; let x = 0; for (const t of a) if (b.has(t)) x += 1; return x / (a.size + b.size - x); };
+    const fixtures = ['反代超时默认60秒会导致504', '用户偏好使用中文回复', '订单导出支持CSV格式', 'DSH 插件用 codeload tarball URL', '库存盘点每周五凌晨执行'];
+    let maxDelta = 0;
+    for (let i = 0; i < fixtures.length; i += 1) {
+      // basic-block text: extended range must tokenize IDENTICALLY (no new tokens).
+      assert.deepEqual([...tokenSetBigram(fixtures[i])].sort(), [...baselineTok(fixtures[i])].sort(),
+        `R6: extended range tokenizes basic-block text identically (${fixtures[i].slice(0, 8)})`);
+      for (let j = i + 1; j < fixtures.length; j += 1) {
+        const d = Math.abs(jac(baselineTok(fixtures[i]), baselineTok(fixtures[j])) - jac(tokenSetBigram(fixtures[i]), tokenSetBigram(fixtures[j])));
+        if (d > maxDelta) maxDelta = d;
+      }
+    }
+    assert.equal(maxDelta, 0, 'R6: zero sim-delta on basic-block text → no adjudicator threshold drift');
+    console.log('OK v0.5.0 R6 drift-guard: extended CJK range = zero sim drift on basic-block text (adjudicator thresholds safe)');
+  }
 }
 
 // ── A2 (v0.5.0): sourceContext field — brick-safe + carried on pending ────────
