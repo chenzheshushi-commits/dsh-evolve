@@ -862,4 +862,39 @@ function makeStoreTable() {
   console.log('OK v0.4.2 idle-trigger: default-off no timer, opt-in unref re-arm, dispose clears, read-only callback');
 }
 
+// ── R5 (v0.5.0): retrieval-path observability ────────────────────────────────
+{
+  const ws = mkdtempSync(join(tmpdir(), 'evolve-r5-'));
+  try {
+    // FTS off → recall must report bigram-only, never claim fused.
+    const stNoFts = new MemoryStore(makeStoreTable(), { workspaceDir: ws, logger: { warn() {}, info() {} }, fts: null });
+    await stNoFts.remember({ content: '反代超时默认60秒会导致504网关错误', kind: 'lesson', importance: 3, tags: ['t'], confirm: true });
+    await stNoFts.recall('反代 超时', 5);
+    const rs = stNoFts.retrievalStatus();
+    assert.equal(rs.mode, 'bigram-only', 'R5: no FTS → mode bigram-only');
+    assert.equal(rs.ftsAvailable, false, 'R5: ftsAvailable false when fts null');
+    assert.ok(rs.bigramOnlyCount >= 1, 'R5: bigram-only recall counted');
+    assert.ok('lastPath' in rs && 'fusedCount' in rs, 'R5: status shape complete');
+    console.log('OK v0.5.0 R5: retrieval observability (bigram-only surfaced, not silently degraded)');
+  } finally { rmSync(ws, { recursive: true, force: true }); }
+}
+
+// ── D1 (v0.5.0): review path must NOT let LLM self-reported anchored auto-confirm ──
+// This asserts the adjudicator contract the D1 fix relies on: an unanchored,
+// non-duplicate, reversible write falls to PENDING. The index.js review loop now
+// forces anchoredToUser:false, so a review suggestion hits exactly this path
+// (unless it's a near-duplicate of a confirmed record) → pending, not auto.
+{
+  const adj2 = await import('./lib/adjudicator.js');
+  // A普通建议（imp2、无冲突、非近重复）在 anchoredToUser:false 下 → pending（不能因 LLM 自封 anchored 抄近路）
+  const asReview = adj2.adjudicate(
+    { content: '某条后台评审推断出的普通事实', kind: 'fact', scope: 'project', importance: 2, anchoredToUser: false }, []);
+  assert.equal(asReview.decision, adj2.DECISION_PENDING, 'D1: review suggestion (anchored:false) → pending, no auto shortcut');
+  // 对照：真正的 caller 传 anchored:true 时仍可 auto（证明只堵 review 路径，不误伤真 caller）
+  const asCaller = adj2.adjudicate(
+    { content: '某条后台评审推断出的普通事实', kind: 'fact', scope: 'project', importance: 2, anchoredToUser: true }, []);
+  assert.equal(asCaller.decision, adj2.DECISION_AUTO, 'D1: real caller with anchored:true still auto (fix targets review only)');
+  console.log('OK v0.5.0 D1: LLM self-reported anchored cannot auto-confirm via review path');
+}
+
 console.log('\nALL SMOKE TESTS PASSED');
