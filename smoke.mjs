@@ -83,6 +83,31 @@ for (const d of [asPref, asFact, conflict.decision]) {
 }
 console.log('OK adjudicator: tiered auto-confirm — anchored→auto, high-imp/conflict/unknown→pending, kind-neutral, switch-off→pending');
 
+// ── v0.5.0 approvalMode: three-tier ingestion autonomy (评审 B4/C2) ───────────
+{
+  const conf2 = [{ content: '用户喜欢用中文回复', kind: 'preference', scope: 'user', importance: 2 }];
+  const dec = (mode, cand) => adj.adjudicate(cand, conf2, { approvalMode: mode }).decision;
+  const plain = { content: '某个全新的项目事实内容ABC', kind: 'fact', scope: 'project', importance: 2 };
+  const hi = { content: '某个重要决策XYZ', kind: 'decision', scope: 'project', importance: 3 };
+  const conflictCand = { content: '用户不喜欢用中文回复了', kind: 'preference', scope: 'user', importance: 2 };
+  // manual → everything pending
+  assert.equal(dec('manual', plain), adj.DECISION_PENDING, 'approvalMode manual: plain → pending');
+  // balanced → plain reversible-but-unanchored still pending (conservative default)
+  assert.equal(dec('balanced', plain), adj.DECISION_PENDING, 'approvalMode balanced: plain unanchored → pending');
+  // autonomous → plain reversible non-conflicting → AUTO (the tier's whole point)
+  assert.equal(dec('autonomous', plain), adj.DECISION_AUTO, 'approvalMode autonomous: plain reversible → auto');
+  // C2 red-line: autonomous MUST still force conflict + high-importance to pending
+  assert.equal(dec('autonomous', hi), adj.DECISION_PENDING, 'approvalMode autonomous: high-importance → still pending (structural guard)');
+  assert.equal(dec('autonomous', conflictCand), adj.DECISION_PENDING, 'approvalMode autonomous: conflict → still pending (structural guard)');
+  // resolveApprovalMode precedence + enum hardening (评审 A7/B1)
+  assert.equal(adj.resolveApprovalMode({ approvalMode: 'yolo' }), 'balanced', 'resolveApprovalMode: illegal value → balanced (not auto)');
+  assert.equal(adj.resolveApprovalMode({ autoConfirmEnabled: false }), 'manual', 'resolveApprovalMode: legacy false → manual');
+  assert.equal(adj.resolveApprovalMode({ approvalMode: 'balanced', autoConfirmEnabled: false }), 'manual', 'resolveApprovalMode: legacy off wins over default-filled balanced');
+  assert.equal(adj.resolveApprovalMode({ approvalMode: 'autonomous', autoConfirmEnabled: false }), 'autonomous', 'resolveApprovalMode: explicit autonomous wins over stale legacy flag');
+  assert.equal(adj.resolveApprovalMode({}), 'balanced', 'resolveApprovalMode: absent → balanced');
+  console.log('OK v0.5.0 approvalMode: 3-tier (manual/balanced/autonomous), autonomous still gates conflict+high-imp, enum hardened');
+}
+
 // ── review: background-review parse + snapshot collector (v0.4.0 direction 3) ─
 const review = await import('./lib/review.js');
 // parseReviewOutput: well-formed MEM lines parse; NONE → empty; junk skipped.
@@ -887,6 +912,90 @@ function makeStoreTable() {
   assert.ok(matchBaseMin('要求用什么语言回复') < 1.0 && matchBaseMin('要求用什么语言回复') >= 0.6, 'R2: long query relaxes toward 0.6 floor');
   assert.ok(matchBaseMin('要求用什么语言回复') >= 0.6, 'R2: never drops below 0.6 (noise floor)');
   console.log('OK v0.5.0 R1+R2: CN tokenizer greedy-fix + fragment down-weight + adaptive threshold (recall↑, precision held)');
+}
+
+// ── A2 (v0.5.0): sourceContext field — brick-safe + carried on pending ────────
+{
+  const spec = await import('./lib/spec.js');
+  // open-verify shape: a record WITHOUT sourceContext (a pre-v0.5.0 record) must
+  // parse without throwing, defaulting sourceContext to '' (评审 A8 brick red-line).
+  const legacy = {
+    id: 'old1', content: '历史记录无新字段', kind: 'note', tags: [], scope: 'project',
+    project: '', importance: 2, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+  };
+  const parsed = spec.MemoryRecordSchema(legacy);
+  assert.equal(parsed.sourceContext, '', 'A2: legacy record without sourceContext defaults to "" (no brick)');
+  // A pending review write carries the snippet through to the record + stats.
+  {
+    const ws = mkdtempSync(join(tmpdir(), 'evolve-a2-'));
+    try {
+      const st = new MemoryStore(makeStoreTable(), { workspaceDir: ws, logger: { warn() {}, info() {} }, fts: null, config: { approvalMode: 'balanced' } });
+      const rec = await st.remember({ content: '一条来自后台评审的待审记忆XYZ', kind: 'note', scope: 'project', importance: 2, sourceContext: '用户说：这个流程以后都这么走' });
+      assert.ok(rec.tags.includes('pending'), 'A2: plain review write lands pending');
+      assert.equal(rec.sourceContext, '用户说：这个流程以后都这么走', 'A2: sourceContext stored on record');
+      const pq = st.stats({ topN: 5 }).pendingQueue.find((p) => p.id === rec.id);
+      assert.ok(pq && pq.sourceContext.includes('用户说'), 'A2: sourceContext surfaced in pending queue for UI');
+      console.log('OK v0.5.0 A2: sourceContext brick-safe (legacy→"") + carried to pending review queue');
+    } finally { rmSync(ws, { recursive: true, force: true }); }
+  }
+}
+
+// ── C4/B1 (v0.5.0): CONFIG_KEY_SPECS single-table drives set-config + /state ──
+{
+  const wr = await import('./lib/web-routes.js');
+  // Every v0.5.0 autonomy key has a whitelist entry (the B1/C4 dead-config bug).
+  for (const k of ['approvalMode', 'reviewMaxAutoPerTurn', 'maxPendingQueue', 'refineLLM', 'tier1Enabled']) {
+    assert.ok(k in wr.CONFIG_KEY_SPECS, `CONFIG_KEY_SPECS has ${k} (reachable from UI)`);
+  }
+  // Enum validation: legal passes, illegal rejected (not silently defaulted).
+  assert.ok(wr.validateConfigValue('approvalMode', 'autonomous').ok, 'validate: autonomous accepted');
+  assert.ok(!wr.validateConfigValue('approvalMode', 'yolo').ok, 'validate: illegal enum rejected');
+  assert.ok(!wr.validateConfigValue('approvalMode', 5).ok, 'validate: wrong-type enum rejected');
+  // Int range validation.
+  assert.ok(wr.validateConfigValue('reviewMaxAutoPerTurn', 5).ok, 'validate: int in range accepted');
+  assert.ok(!wr.validateConfigValue('reviewMaxAutoPerTurn', 5.5).ok, 'validate: non-integer rejected');
+  assert.ok(!wr.validateConfigValue('reviewMaxAutoPerTurn', -1).ok, 'validate: below-min rejected');
+  assert.ok(!wr.validateConfigValue('maxPendingQueue', 99999).ok, 'validate: above-max rejected');
+  // Unknown key rejected.
+  assert.ok(!wr.validateConfigValue('__nope__', 1).ok, 'validate: unknown key rejected');
+  // readConfigView returns COMPLETE config with defaults (never partial — 评审 F1).
+  const view = wr.readConfigView({ approvalMode: 'autonomous' });
+  assert.equal(view.approvalMode, 'autonomous', 'readConfigView: explicit value kept');
+  assert.equal(view.maxPendingQueue, 50, 'readConfigView: unset key gets default (complete view)');
+  assert.equal(view.tier1Enabled, true, 'readConfigView: all keys present');
+  // Illegal stored value falls back to default at read (defense in depth).
+  assert.equal(wr.readConfigView({ approvalMode: 'garbage' }).approvalMode, 'balanced', 'readConfigView: illegal stored enum → default');
+  console.log('OK v0.5.0 CONFIG_KEY_SPECS: single-table drives validate + read; enum/int hardened; complete view (B1/C4/F1)');
+}
+
+// ── C1 (v0.5.0): pending-queue hard cap bounds unbounded growth ───────────────
+{
+  const ws = mkdtempSync(join(tmpdir(), 'evolve-c1-'));
+  try {
+    const st = new MemoryStore(makeStoreTable(), {
+      workspaceDir: ws, logger: { warn() {}, info() {} }, fts: null,
+      config: { maxPendingQueue: 3, approvalMode: 'balanced', mergeSimilarity: 0.7 },
+    });
+    // Six semantically-distinct plain writes (each lands pending under balanced).
+    const contents = [
+      '反向代理超时导致网关504错误', '用户偏好深色主题界面配色', '数据库连接池最大值设置为20',
+      '邮件发送需要配置SMTP端口号', '订单导出功能支持CSV格式', '库存盘点每周五凌晨执行',
+    ];
+    let landed = 0; let dropped = 0;
+    for (const c of contents) {
+      const r = await st.remember({ content: c, kind: 'note', scope: 'project', importance: 2 });
+      if (r) landed += 1; else dropped += 1;
+    }
+    assert.equal(landed, 3, 'C1: pending queue capped at maxPendingQueue (3 land)');
+    assert.equal(dropped, 3, 'C1: writes beyond cap are refused (3 dropped)');
+    assert.equal(st.all().filter((r) => r.tags.includes('pending')).length, 3, 'C1: pending pool stays bounded at cap');
+    // A near-duplicate of an existing pending item REINFORCES (no new row), so the
+    // cap doesn't block it — it must not be counted as a fresh pending write.
+    const before = st.all().length;
+    await st.remember({ content: '反向代理超时会导致网关返回504错误', kind: 'note', scope: 'project', importance: 2 });
+    assert.equal(st.all().length, before, 'C1: near-duplicate reinforces (no new row), exempt from cap');
+    console.log('OK v0.5.0 C1: pending-queue hard cap bounds growth (autonomous + no-auto-delete stays bounded)');
+  } finally { rmSync(ws, { recursive: true, force: true }); }
 }
 
 // ── R5 (v0.5.0): retrieval-path observability ────────────────────────────────

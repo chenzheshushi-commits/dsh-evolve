@@ -96,6 +96,49 @@ await store.remember({ content: '一条待确认记忆', kind: 'note', importanc
   console.log('OK web set-config: toggles refineLLM + picks model (mutates live cfg)');
 }
 
+// v0.5.0: set-config approvalMode end-to-end (ev审 B1/C4/F1) — the key that used
+// to be a dead config (no whitelist entry) now round-trips through the API.
+{
+  const res = mockRes();
+  await R['/api/evolve/action'].handler(mockReq({ method: 'POST', body: { action: 'set-config', approvalMode: 'autonomous', reviewMaxAutoPerTurn: 3 } }), res);
+  assert.equal(res.statusCode, 200, 'set-config approvalMode 200');
+  assert.equal(cfg.approvalMode, 'autonomous', 'set-config mutated cfg.approvalMode -> autonomous');
+  assert.equal(cfg.reviewMaxAutoPerTurn, 3, 'set-config mutated cfg.reviewMaxAutoPerTurn -> 3');
+  // F1: response carries the COMPLETE config view, not just the patched keys.
+  const body = JSON.parse(res.body);
+  assert.equal(body?.config?.approvalMode, 'autonomous', 'set-config returns complete config (approvalMode)');
+  assert.ok('maxPendingQueue' in (body?.config ?? {}), 'set-config returns complete config (unsent keys present)');
+  assert.ok('refineLLM' in (body?.config ?? {}), 'set-config returns complete config (other keys present, no clobber)');
+  console.log('OK web set-config: approvalMode round-trips + returns complete config (B1/C4/F1)');
+}
+
+// v0.5.0: illegal / empty patches are rejected with 400 (not a silent 200).
+{
+  const before = cfg.approvalMode;
+  const r1 = mockRes();
+  await R['/api/evolve/action'].handler(mockReq({ method: 'POST', body: { action: 'set-config', approvalMode: 'yolo' } }), r1);
+  assert.equal(r1.statusCode, 400, 'illegal enum → 400');
+  assert.equal(cfg.approvalMode, before, 'illegal enum did NOT mutate cfg');
+  const r2 = mockRes();
+  await R['/api/evolve/action'].handler(mockReq({ method: 'POST', body: { action: 'set-config', bogusKey: 1 } }), r2);
+  assert.equal(r2.statusCode, 400, 'unknown key → 400');
+  const r3 = mockRes();
+  await R['/api/evolve/action'].handler(mockReq({ method: 'POST', body: { action: 'set-config' } }), r3);
+  assert.equal(r3.statusCode, 400, 'empty patch → 400');
+  console.log('OK web set-config: illegal enum / unknown key / empty patch all → 400 (no silent failure)');
+}
+
+// v0.5.0: /state returns the COMPLETE config view including autonomy keys.
+{
+  const res = mockRes();
+  await R['/api/evolve/state'].handler(mockReq({ method: 'GET' }), res);
+  assert.equal(res.statusCode, 200, '/state 200');
+  const body = JSON.parse(res.body);
+  assert.ok('approvalMode' in (body?.config ?? {}), '/state config includes approvalMode');
+  assert.ok('retrieval' in (body ?? {}), '/state includes retrieval observability (R5)');
+  console.log('OK web /state: complete config view + retrieval observability (R5)');
+}
+
 // POST /action confirm-batch (confirms the pending memory)
 {
   const res = mockRes();

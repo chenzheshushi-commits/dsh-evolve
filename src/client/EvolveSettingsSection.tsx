@@ -18,7 +18,7 @@ import { useCallback, useEffect, useState } from 'react'
 const API = '/api/evolve'
 
 interface ModelRow { provider: string; model: string }
-interface PendingRow { id: string; kind: string; importance: number; content: string }
+interface PendingRow { id: string; kind: string; importance: number; content: string; sourceContext?: string }
 interface InjRow { id: string; kind: string; importance: number; injectionCount: number; content: string }
 interface TriageSkill { loaded: number; succeeded: number; errored: number }
 interface PruneMemCand {
@@ -40,7 +40,11 @@ interface PruneState {
 }
 interface EvolveState {
   ok: boolean
-  config: { refineLLM: boolean; refineProvider: string; refineModel: string; tier1Enabled: boolean }
+  config: {
+    refineLLM: boolean; refineProvider: string; refineModel: string; tier1Enabled: boolean
+    approvalMode: 'manual' | 'balanced' | 'autonomous'
+    reviewMaxAutoPerTurn: number; maxPendingQueue: number
+  }
   models: ModelRow[]
   memoryStats: {
     total: number; confirmed: number; pending: number; maxRecords: number
@@ -51,6 +55,10 @@ interface EvolveState {
   skillStats: {
     counts: { active: number; stale: number; archived: number }
     triage?: { totalTurns: number; successes: number; failures: number; bySkill: Record<string, TriageSkill> } | { disabled: true }
+  }
+  retrieval?: {
+    mode: string; ftsEnabled: boolean; ftsAvailable: boolean
+    lastPath?: string; fusedCount?: number; bigramOnlyCount?: number; ftsErrorCount?: number
   }
 }
 
@@ -213,6 +221,37 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
         </div>
       </div>
 
+      {/* ── Block 1.5: 摄入自治程度 (v0.5.0 direction 1) ── */}
+      <div style={box}>
+        <b>记忆摄入自治程度</b>
+        <div style={dim}>决定「模型/后台评审想记的东西」有多少能自动生效，多少要你先过目。切档只影响之后的新记忆，不会批量放行已有的待确认项。</div>
+        <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {([
+            ['manual', '手动', '全部先进待确认，你逐条确认后才生效。最保守。'],
+            ['balanced', '平衡（默认）', '拿得准的（锚定你原话、或与已确认高度重复）自动生效；拿不准的进待确认。'],
+            ['autonomous', '自治', '凡是可逆、不冲突的都自动生效；重要(imp3)/冲突项仍强制进待确认。写入量另有上限保护。'],
+          ] as const).map(([mode, label, desc]) => {
+            const active = (cfg?.approvalMode ?? 'balanced') === mode
+            return (
+              <button
+                key={mode}
+                style={{ ...(active ? btnPrimary : btn), marginRight: 0, flex: '1 1 200px', textAlign: 'left', padding: 10, opacity: saving ? 0.6 : 1 }}
+                disabled={saving || !cfg}
+                onClick={() => void setConfig({ approvalMode: mode })}
+              >
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>{active ? '● ' : '○ '}{label}</div>
+                <div style={{ fontSize: 12, opacity: 0.85, fontWeight: 400 }}>{desc}</div>
+              </button>
+            )
+          })}
+        </div>
+        {cfg?.approvalMode === 'autonomous' && (
+          <div style={{ ...dim, marginTop: 8, color: 'var(--dsh-warn, #b45309)' }}>
+            ⚠️ 自治档下后台评审会自动写入更多记忆。每轮最多自动确认 {cfg?.reviewMaxAutoPerTurn ?? 5} 条，待确认队列上限 {cfg?.maxPendingQueue ?? 50} 条——超出的会被拒收以防无界增长。冲突和重要记忆仍需你确认。
+          </div>
+        )}
+      </div>
+
       {/* ── Block 2: Approval queue ── */}
       <div style={box}>
         <b>待确认记忆（审批门）</b>
@@ -222,9 +261,16 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
             <table style={{ width: '100%', marginTop: 8, ...mono }}>
               <tbody>
                 {s.memoryStats.pendingQueue.map((r) => (
-                  <tr key={r.id}>
+                  <tr key={r.id} style={{ verticalAlign: 'top' }}>
                     <td style={{ opacity: 0.6, whiteSpace: 'nowrap' }}>[{r.kind}/imp{r.importance}]</td>
-                    <td style={{ paddingLeft: 8 }}>{r.content}</td>
+                    <td style={{ paddingLeft: 8 }}>
+                      <div>{r.content}</div>
+                      {r.sourceContext ? (
+                        <div style={{ ...dim, fontSize: 11, marginTop: 2, borderLeft: '2px solid var(--dsh-border, #444)', paddingLeft: 6 }}>
+                          来源：{r.sourceContext}
+                        </div>
+                      ) : null}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -235,6 +281,28 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
           </>
         ) : <div style={{ ...dim, marginTop: 8 }}>（无待确认记忆）</div>}
       </div>
+
+      {/* ── Block 2.2: 检索健康度 (v0.5.0 R5) ── */}
+      {s?.retrieval ? (
+        <div style={box}>
+          <b>记忆检索状态</b>
+          <div style={{ ...mono, marginTop: 8 }}>
+            {s.retrieval.mode === 'fused' ? (
+              <span style={{ color: '#16a34a' }}>● 融合检索（bigram + 全文索引）— 召回最佳</span>
+            ) : s.retrieval.mode === 'bigram-only' ? (
+              <span style={{ color: 'var(--dsh-warn, #b45309)' }}>▲ 仅 bigram 检索 — 全文索引不可用，中文长句/转述查询召回会变差</span>
+            ) : s.retrieval.mode === 'fts-degraded' ? (
+              <span style={{ color: '#dc2626' }}>▲ 全文索引运行时降级 — 召回质量已下降（错误 {s.retrieval.ftsErrorCount ?? 0} 次）</span>
+            ) : (
+              <span style={dim}>状态未知（尚无检索发生）</span>
+            )}
+          </div>
+          <div style={{ ...dim, fontSize: 12, marginTop: 4 }}>
+            全文索引：{s.retrieval.ftsEnabled ? '已启用' : '已关闭'} · {s.retrieval.ftsAvailable ? '可用' : '不可用'}
+            {typeof s.retrieval.fusedCount === 'number' ? ` · 融合 ${s.retrieval.fusedCount} 次 / 降级 ${s.retrieval.bigramOnlyCount ?? 0} 次` : ''}
+          </div>
+        </div>
+      ) : null}
 
       {/* ── Block 2.5: Controlled prune (v0.4.2) ── */}
       <div style={box}>
