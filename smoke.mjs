@@ -862,6 +862,33 @@ function makeStoreTable() {
   console.log('OK v0.4.2 idle-trigger: default-off no timer, opt-in unref re-arm, dispose clears, read-only callback');
 }
 
+// ── R1+R2 (v0.5.0): CN tokenizer fix + adaptive threshold (评审 A3/B6 精度红线) ──
+{
+  const { scoreRecord, matchBaseMin, rankRecords } = await import('./lib/search.js');
+  const mkRec = (id, content, tags = [], importance = 2) => ({
+    id, content, tags, kind: 'note', scope: 'project', importance,
+    createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+    accessCount: 0, observationCount: 1,
+  });
+  const pref = mkRec('m1', '用户偏好：使用中文回复，技术术语可保留英文', ['语言', '中文']);
+  const noise = mkRec('m2', 'DSH cordis loader 支持 mount 自动让位机制的说明文档很长很长');
+  // R1: greedy-swallow fix — a paraphrase run scores > 0 now (was 0 pre-fix).
+  assert.ok(scoreRecord(pref, '要求用什么语言回复') > 0, 'R1: chatty CN query no longer scores 0 on real hit');
+  // R1 guard (a): stopword-laden fragments (要求/什么) must not lift unrelated long records.
+  assert.ok(
+    scoreRecord(pref, '要求用什么语言回复') > scoreRecord(noise, '要求用什么语言回复'),
+    'R1: real hit outranks stopword-fragment coincidence on long record',
+  );
+  // R1 guard (b) + precision red-line: an unrelated query must NOT surface the pref record.
+  assert.equal(scoreRecord(pref, '编程语言'), 0, 'R1: 编程语言 does not false-match 中文偏好 (precision)');
+  assert.equal(scoreRecord(pref, '自然语言'), 0, 'R1: 自然语言 does not false-match 中文偏好 (precision)');
+  // R2: adaptive threshold — strict for short queries, relaxed (≥0.6) for long ones.
+  assert.equal(matchBaseMin('语言'), 1.0, 'R2: short 2-char CN query keeps strict 1.0 floor');
+  assert.ok(matchBaseMin('要求用什么语言回复') < 1.0 && matchBaseMin('要求用什么语言回复') >= 0.6, 'R2: long query relaxes toward 0.6 floor');
+  assert.ok(matchBaseMin('要求用什么语言回复') >= 0.6, 'R2: never drops below 0.6 (noise floor)');
+  console.log('OK v0.5.0 R1+R2: CN tokenizer greedy-fix + fragment down-weight + adaptive threshold (recall↑, precision held)');
+}
+
 // ── R5 (v0.5.0): retrieval-path observability ────────────────────────────────
 {
   const ws = mkdtempSync(join(tmpdir(), 'evolve-r5-'));
