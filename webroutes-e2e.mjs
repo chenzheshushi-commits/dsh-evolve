@@ -56,6 +56,7 @@ const routes = makeEvolveRoutes({
   getConfig: () => cfg,
   setConfig: (patch) => { Object.assign(cfg, patch); },
   skillStates: () => ({ counts: { active: 0, stale: 0, archived: 0 }, triage: { disabled: true } }),
+  getSuggestedDisposal: () => ({ candidates: store.disposalCandidates(), computedAt: Date.now(), mode: cfg.disposalMode }),
 });
 const R = routeMap(routes);
 assert.ok(R['/api/evolve/state'] && R['/api/evolve/action'], 'both routes present');
@@ -133,10 +134,29 @@ await store.remember({ content: '一条待确认记忆', kind: 'note', importanc
   const res = mockRes();
   await R['/api/evolve/state'].handler(mockReq({ method: 'GET' }), res);
   assert.equal(res.statusCode, 200, '/state 200');
-  const body = JSON.parse(res.body);
-  assert.ok('approvalMode' in (body?.config ?? {}), '/state config includes approvalMode');
-  assert.ok('retrieval' in (body ?? {}), '/state includes retrieval observability (R5)');
-  console.log('OK web /state: complete config view + retrieval observability (R5)');
+  const body = JSON.parse(res.body)
+  assert.ok('approvalMode' in (body?.config ?? {}), '/state config includes approvalMode')
+  assert.ok('retrieval' in (body ?? {}), '/state includes retrieval observability (R5)')
+  console.log('OK web /state: complete config view + retrieval observability (R5)')
+}
+
+// v0.5.0 direction 2: disposalMode round-trips + /state carries disposalSuggest.
+{
+  const res = mockRes()
+  await R['/api/evolve/action'].handler(mockReq({ method: 'POST', body: { action: 'set-config', disposalMode: 'suggest', disposalMinIdleDays: 14 } }), res)
+  assert.equal(res.statusCode, 200, 'set-config disposalMode 200')
+  assert.equal(cfg.disposalMode, 'suggest', 'set-config mutated cfg.disposalMode -> suggest')
+  assert.equal(cfg.disposalMinIdleDays, 14, 'set-config mutated cfg.disposalMinIdleDays -> 14')
+  // illegal disposal tier rejected (tidy is NOT a shipped tier in v0.5.0)
+  const bad = mockRes()
+  await R['/api/evolve/action'].handler(mockReq({ method: 'POST', body: { action: 'set-config', disposalMode: 'tidy' } }), bad)
+  assert.equal(bad.statusCode, 400, 'disposalMode tidy (not shipped) → 400')
+  // /state carries the disposalSuggest snapshot
+  const st = mockRes()
+  await R['/api/evolve/state'].handler(mockReq({ method: 'GET' }), st)
+  const sbody = JSON.parse(st.body)
+  assert.ok('disposalSuggest' in (sbody ?? {}), '/state includes disposalSuggest snapshot')
+  console.log('OK web disposalMode: round-trips, tidy rejected (400), /state carries suggest snapshot')
 }
 
 // POST /action confirm-batch (confirms the pending memory)

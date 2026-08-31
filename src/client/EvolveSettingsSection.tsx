@@ -44,6 +44,8 @@ interface EvolveState {
     refineLLM: boolean; refineProvider: string; refineModel: string; tier1Enabled: boolean
     approvalMode: 'manual' | 'balanced' | 'autonomous'
     reviewMaxAutoPerTurn: number; maxPendingQueue: number
+    disposalMode: 'manual' | 'suggest'
+    disposalMinIdleDays: number
   }
   models: ModelRow[]
   memoryStats: {
@@ -59,6 +61,10 @@ interface EvolveState {
   retrieval?: {
     mode: string; ftsEnabled: boolean; ftsAvailable: boolean
     lastPath?: string; fusedCount?: number; bigramOnlyCount?: number; ftsErrorCount?: number
+  }
+  disposalSuggest?: {
+    mode: string; computedAt: number
+    candidates: Array<{ id: string; kind: string; importance: number; content: string; ageDays: number; reason: string }>
   }
 }
 
@@ -304,6 +310,52 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
         </div>
       ) : null}
 
+      {/* ── Block 2.4: 处置自治程度 (v0.5.0 direction 2) ── */}
+      <div style={box}>
+        <b>记忆处置自治程度</b>
+        <div style={dim}>决定「系统要不要主动提议清理冷记忆」。注意：处置永远只到「提议」——任何档位都不会自动删除，删不删由你在下方受控剪枝里勾选。（技能的合并/归档永远手动，不进自动提议。）</div>
+        <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {([
+            ['manual', '手动', '系统不主动提议。你自己在下方受控剪枝里筛选处理。'],
+            ['suggest', '建议', '空闲时自动重算「从未注入、从未召回、且过了冷静期」的低价值记忆，列给你看；仍然只提议、不自动删。'],
+          ] as const).map(([mode, label, desc]) => {
+            const active = (cfg?.disposalMode ?? 'manual') === mode
+            return (
+              <button
+                key={mode}
+                style={{ ...(active ? btnPrimary : btn), marginRight: 0, flex: '1 1 220px', textAlign: 'left', padding: 10, opacity: saving ? 0.6 : 1 }}
+                disabled={saving || !cfg}
+                onClick={() => void setConfig({ disposalMode: mode })}
+              >
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>{active ? '● ' : '○ '}{label}</div>
+                <div style={{ fontSize: 12, opacity: 0.85, fontWeight: 400 }}>{desc}</div>
+              </button>
+            )
+          })}
+        </div>
+        {cfg?.disposalMode === 'suggest' && s?.disposalSuggest ? (
+          <div style={{ marginTop: 10 }}>
+            <div style={dim}>冷静期：{cfg?.disposalMinIdleDays ?? 30} 天。空闲时自动重算，{s.disposalSuggest.computedAt ? `上次算于 ${new Date(s.disposalSuggest.computedAt).toLocaleString()}` : '（还未触发，需空闲一段时间）'}</div>
+            {s.disposalSuggest.candidates.length > 0 ? (
+              <table style={{ width: '100%', marginTop: 6, ...mono }}>
+                <tbody>
+                  {s.disposalSuggest.candidates.map((c) => (
+                    <tr key={c.id} style={{ verticalAlign: 'top' }}>
+                      <td style={{ opacity: 0.6, whiteSpace: 'nowrap' }}>[{c.kind}/imp{c.importance}]</td>
+                      <td style={{ paddingLeft: 8 }}>
+                        <div>{c.content}</div>
+                        <div style={{ ...dim, fontSize: 11 }}>冷置 {c.ageDays} 天 · {c.reason}</div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : <div style={{ ...dim, marginTop: 6 }}>（暂无低价值候选——库还小或都在用）</div>}
+            <div style={{ ...dim, fontSize: 12, marginTop: 6 }}>要真正清理，请到下方「受控剪枝」勾选执行（两阶段预览→确认，全部可逆）。</div>
+          </div>
+        ) : null}
+      </div>
+
       {/* ── Block 2.5: Controlled prune (v0.4.2) ── */}
       <div style={box}>
         <b>受控剪枝</b>
@@ -351,10 +403,27 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
               <button style={btn} disabled={saving} onClick={() => void doPreview()}>预览将处理的记忆</button>
             ) : (
               <div style={{ border: '1px dashed var(--dsh-border,#555)', borderRadius: 6, padding: 8 }}>
-                <div style={{ marginBottom: 6 }}>预览：</div>
-                {preview.preview.map((p, i) => (
-                  <div key={i} style={mono}>· {p.action} × {p.count}｜{p.allowed ? '将执行' : `跳过（${p.reason}）`}{p.requires ? `（需 ${p.requires}）` : ''}（软删，可恢复）</div>
-                ))}
+                <div style={{ marginBottom: 6, fontWeight: 600 }}>预览（软删，全部可恢复）：</div>
+                <table style={{ width: '100%', ...mono, borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ ...dim, textAlign: 'left', borderBottom: '1px solid var(--dsh-border,#444)' }}>
+                      <th style={{ padding: '2px 6px' }}>动作</th>
+                      <th style={{ padding: '2px 6px' }}>数量</th>
+                      <th style={{ padding: '2px 6px' }}>结果</th>
+                      <th style={{ padding: '2px 6px' }}>说明</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {preview.preview.map((p, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid var(--dsh-border,#2a2a2a)' }}>
+                        <td style={{ padding: '2px 6px' }}>{p.action}</td>
+                        <td style={{ padding: '2px 6px', textAlign: 'right' }}>{p.count}</td>
+                        <td style={{ padding: '2px 6px', color: p.allowed ? '#16a34a' : '#b45309' }}>{p.allowed ? '将执行' : '跳过'}</td>
+                        <td style={{ padding: '2px 6px', ...dim }}>{p.allowed ? '' : p.reason}{p.requires ? `（需 ${p.requires}）` : ''}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
                 <div style={{ marginTop: 8 }}>
                   <button style={btnPrimary} disabled={saving} onClick={() => void doExecute()}>确认执行</button>
                   <button style={btn} disabled={saving} onClick={() => setPreview(null)}>取消</button>

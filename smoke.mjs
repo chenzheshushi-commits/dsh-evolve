@@ -962,6 +962,38 @@ function makeStoreTable() {
   }
 }
 
+// ── Direction 2 (v0.5.0): disposal-suggest candidate rule (B3/C3/C8/E1) ───────
+{
+  const ws = mkdtempSync(join(tmpdir(), 'evolve-disp-'));
+  try {
+    const st = new MemoryStore(makeStoreTable(), {
+      workspaceDir: ws, logger: { warn() {}, info() {} }, fts: null,
+      config: { approvalMode: 'balanced', disposalMinIdleDays: 30 },
+    });
+    const old = Date.now() - 40 * 86400000;   // 40 days ago (past 30d cool-off)
+    const recent = Date.now() - 5 * 86400000;  // 5 days ago (within cool-off)
+    // A cold note: old, zero-use, plain kind, confirmed → candidate.
+    await st.remember({ content: '一条很久没用的冷记忆内容AAA', kind: 'note', scope: 'project', importance: 2, confirm: true, now: old });
+    // A protected kind (preference) — never a candidate even if cold.
+    await st.remember({ content: '用户偏好某种设定BBB', kind: 'preference', scope: 'user', importance: 2, confirm: true, now: old });
+    // A recent note — within cool-off, not a candidate.
+    await st.remember({ content: '最近刚记的东西CCC', kind: 'note', scope: 'project', importance: 2, confirm: true, now: recent });
+    // A pending note (C3) — held for review, must NOT be a candidate even if cold.
+    await st.remember({ content: '一条待审核的冷记忆DDD', kind: 'note', scope: 'project', importance: 2, now: old });
+    const cands = st.disposalCandidates();
+    const ids = cands.map((c) => c.content);
+    assert.ok(ids.some((c) => c.includes('AAA')), 'disposal: cold plain note IS a candidate');
+    assert.ok(!ids.some((c) => c.includes('BBB')), 'disposal: protected kind (preference) NEVER a candidate');
+    assert.ok(!ids.some((c) => c.includes('CCC')), 'disposal: recent (within cool-off) NOT a candidate');
+    assert.ok(!ids.some((c) => c.includes('DDD')), 'disposal C3: pending record NEVER a candidate (not a cold asset)');
+    // pinned exemption — pin a cold record directly via the store table.
+    const cold2 = await st.remember({ content: '将被pin住的冷记忆EEE', kind: 'note', scope: 'project', importance: 2, confirm: true, now: old });
+    await st.table.put(cold2.id, { ...(await st.table.get(cold2.id)), pinned: true });
+    assert.ok(!st.disposalCandidates().some((c) => c.content.includes('EEE')), 'disposal: pinned NEVER a candidate');
+    console.log('OK v0.5.0 disposal-suggest: objective non-heat rule (cold+zero-use+cooloff), excludes protected/pending/recent/pinned (B3/C3/C8/E1)');
+  } finally { rmSync(ws, { recursive: true, force: true }); }
+}
+
 // ── C4/B1 (v0.5.0): CONFIG_KEY_SPECS single-table drives set-config + /state ──
 {
   const wr = await import('./lib/web-routes.js');
