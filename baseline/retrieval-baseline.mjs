@@ -45,7 +45,10 @@ const QUERIES = [
   { q: '回复语言', matcher: ['中文', '语言'], type: '转述' },
   { q: '反向代理超时', matcher: ['反代', '超时', '504'], type: '转述' },
   // —— 对抗性假阳性（防 R1 子串降权引入噪音）——
-  { q: '编程语言', matcher: null, type: '对抗', note: '库里应无"编程语言"，看是否误召回中文偏好' },
+  // 注意 R3(tags进索引)后：fused 模式下"编程语言"会因 tag"语言" OR-命中中文偏好记录
+  // （FTS OR 语义的已知代价，换来"回复语言"等 tag 召回）。这不是回归失败——bigram-only
+  // 降级路径仍 0 召回（打分器 tag 匹配是整串 includes，见 search.js scoreRecord）。
+  { q: '编程语言', matcher: null, type: '对抗', note: '库里应无"编程语言"；fused 下可能因 tag 命中中文偏好(R3 OR 语义已知代价), bigram-only 应 0' },
   // —— 既有正常查询（回归对照）——
   { q: '超时', matcher: ['超时', '504', '反代'], type: '对照' },
   { q: '反代', matcher: ['反代'], type: '对照' },

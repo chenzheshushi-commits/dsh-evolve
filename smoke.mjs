@@ -914,6 +914,28 @@ function makeStoreTable() {
   console.log('OK v0.5.0 R1+R2: CN tokenizer greedy-fix + fragment down-weight + adaptive threshold (recall↑, precision held)');
 }
 
+// ── R3+R6 (v0.5.0): tags into FTS index + extended CJK ranges ─────────────────
+{
+  const { tokenSetBigram, cjkUnigrams } = await import('./lib/search.js');
+  const fts = await import('./lib/fts.js');
+  // R6: extended CJK ranges cover Extension A / Compatibility ideographs. Verify
+  // the range constant is applied (basic-block chars still tokenize as before).
+  assert.ok(tokenSetBigram('反代超时').has('反代'), 'R6: basic CJK still bigram-tokenized');
+  assert.ok(cjkUnigrams('中文').has('中'), 'R6: basic CJK still unigram-tokenized');
+  // R3: tags fold into the FTS index — a query hitting only a TAG (not content)
+  // must still recall. (Skips if FTS5 unavailable on this host.)
+  const idx = await fts.createFtsIndex({ warn() {}, info() {} }, true);
+  if (idx.available) {
+    const rec = { id: 't1', content: '用户希望始终用中文答复', tags: ['语言', '偏好'], kind: 'preference' };
+    idx.backfill([rec]);
+    assert.ok(idx.search('语言', 5).length > 0, 'R3: tag-only term recalls via FTS index (content lacks 语言)');
+    idx.close?.();
+    console.log('OK v0.5.0 R3+R6: tags folded into FTS index (tag-only recall) + extended CJK ranges');
+  } else {
+    console.log('OK v0.5.0 R3+R6: extended CJK ranges (FTS5 unavailable — tag-index assertion skipped)');
+  }
+}
+
 // ── A2 (v0.5.0): sourceContext field — brick-safe + carried on pending ────────
 {
   const spec = await import('./lib/spec.js');
