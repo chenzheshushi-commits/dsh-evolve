@@ -39,7 +39,7 @@ dsh plugin --profile web add github:chenzheshushi-commits/dsh-evolve
 Pin a specific release instead of tracking `main`:
 
 ```bash
-dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.5.0/dsh-evolve-0.5.0.tgz"
+dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.5.1/dsh-evolve-0.5.1.tgz"
 ```
 
 Then restart the harness — tools are discovered at startup, not hot-reloaded.
@@ -189,6 +189,19 @@ behavior on failure. Nothing runs in your main loop.
 ---
 
 ---
+
+---
+
+## What's new in v0.5.1
+
+**Fix: the always-on preference snapshot now reaches every new conversation.**
+
+The Tier 1 always-on snapshot — the `【dsh-evolve】用户长期偏好/事实` block of durable user preferences/facts injected at the start of each turn — was deduplicated with a **process-global** last-key. Because durable preferences rarely change, the snapshot text stayed identical, so after the *first* conversation injected it, **every later conversation's first turn was silently suppressed** and never received the block at all. The per-step relevant-recall injector had the same class of cross-session leak on its repeat-suppressor.
+
+- **Dedupe is now per-session**, keyed by the session via a `WeakMap`. Each new conversation gets the always-on block on turn 1; within a single conversation an unchanged snapshot is still skipped (the prompt-cache protection that dedupe was meant to provide is preserved). The `WeakMap` is reclaimed with the session — no manual cleanup, no leak.
+- Regression test drives the real `apply(ctx)` with two independent sessions and asserts both the cross-session injection and the within-session suppression. Retrieval baseline unchanged (5/5 recall, MRR 1.0, R6 drift 0).
+
+No config or API changes; no migration.
 
 ---
 
