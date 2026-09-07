@@ -1119,4 +1119,77 @@ function makeStoreTable() {
   console.log('OK v0.5.0 D1: LLM self-reported anchored cannot auto-confirm via review path');
 }
 
+// ── v0.5.1: per-session injection dedupe (Tier1 always-on + recall) ──────────
+// Regression for the cross-session leak: a PROCESS-GLOBAL last-key let the first
+// session's injection suppress every LATER session's first turn (durable prefs
+// rarely change → identical snapshot → new conversations silently got no
+// always-on block). Drives the REAL apply(ctx) with a handler-capturing mock ctx
+// and two independent sessions. Asserts: (1) each new session's first turn injects
+// the Tier1 block, AND (2) within one session an unchanged snapshot is still
+// skipped (prompt-cache protection preserved).
+{
+  const home = mkdtempSync(join(tmpdir(), 'evolve-session-dedupe-'));
+  const prevHome = process.env.DSH_HOME;
+  process.env.DSH_HOME = home;
+  try {
+    const mkTable = () => {
+      const m = new Map();
+      return {
+        put(k, v) { m.set(k, v); return true; },
+        get(k) { return m.get(k); },
+        delete(k) { return m.delete(k); },
+        update(k, fn) { const nv = fn(m.get(k)); m.set(k, nv); return nv; },
+        entries() { return [...m.entries()]; },
+        get size() { return m.size; },
+      };
+    };
+    const opened = new Map();
+    const mkDomain = () => { const t = new Map(); return { table(n) { if (!t.has(n)) t.set(n, mkTable()); return t.get(n); }, close() {} }; };
+    const captured = {};
+    const ctx = {
+      logger: { info() {}, warn() {}, error() {} },
+      storageDomain: { get: (n) => opened.get(n), open: async (d) => { const dm = mkDomain(); opened.set(d.name, dm); return dm; } },
+      tools: { register() {}, get: () => undefined },
+      systemPrompt: { section() {}, context() {}, variable() {} },
+      on: (evt, fn) => { (captured[evt] ??= []).push(fn); },
+      effect: () => {},
+      get: () => ({ currentInitiator: () => undefined }),
+      llm: { stream: async function* () {} },
+      plugin(child, cfg2) { const deps = child?.inject ?? []; if (deps.every((d) => ctx[d] !== undefined) && typeof child?.apply === 'function') void child.apply(ctx, cfg2); },
+      webServer: { register: () => () => {} },
+    };
+    await mod.apply(ctx, {});
+
+    // Seed one stable, high-importance user preference (identical snapshot across sessions).
+    const iso = new Date().toISOString();
+    opened.get('evolve_memory').table('records').put('mem_pref_1', {
+      id: 'mem_pref_1', content: '用户偏好中文回复、少过渡词', kind: 'preference',
+      tags: [], scope: 'user', project: '', importance: 3,
+      createdAt: iso, updatedAt: iso, accessedAt: '', accessCount: 0,
+      injectionCount: 0, expiresAt: '', crystallizedAt: '',
+    });
+
+    const textOf = (msg) => { try { return msg.content.map((c) => c.text ?? '').join(''); } catch { return ''; } };
+    const TIER1_MARK = '用户长期偏好/事实';
+    const mkSess = (n) => { const injected = []; const agent = { id: `s${n}`, inject: (m) => injected.push(m) }; agent.session = { id: `s${n}`, agent }; return { session: agent.session, injected }; };
+    const turnStart = captured['session/event'] ?? [];
+    const fire = (sess, turn) => { for (const h of turnStart) { try { h(sess.session, { type: 'turn/start', data: { turn } }); } catch { /* not all session/event handlers handle turn/start */ } } };
+    const tier1Count = (sess) => sess.injected.filter((m) => textOf(m).includes(TIER1_MARK)).length;
+
+    const A = mkSess(1);
+    const B = mkSess(2);
+
+    fire(A, 0);
+    assert.equal(tier1Count(A), 1, 'session A first turn injects Tier1 always-on block');
+    fire(A, 1); // same session, unchanged snapshot → must be suppressed (prompt-cache protection)
+    assert.equal(tier1Count(A), 1, 'session A second turn suppresses unchanged Tier1 (dedupe intact within session)');
+    fire(B, 0); // NEW session, identical snapshot → must STILL inject (the bug this fixes)
+    assert.equal(tier1Count(B), 1, 'session B first turn ALSO injects Tier1 (per-session dedupe, no cross-session leak)');
+    console.log('OK v0.5.1 per-session dedupe: Tier1 injects per new session, still suppressed within a session');
+  } finally {
+    if (prevHome === undefined) delete process.env.DSH_HOME; else process.env.DSH_HOME = prevHome;
+    rmSync(home, { recursive: true, force: true });
+  }
+}
+
 console.log('\nALL SMOKE TESTS PASSED');
