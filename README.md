@@ -39,7 +39,7 @@ dsh plugin --profile web add github:chenzheshushi-commits/dsh-evolve
 Pin a specific release instead of tracking `main`:
 
 ```bash
-dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.5.1/dsh-evolve-0.5.1.tgz"
+dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.5.2/dsh-evolve-0.5.2.tgz"
 ```
 
 Then restart the harness — tools are discovered at startup, not hot-reloaded.
@@ -189,6 +189,42 @@ behavior on failure. Nothing runs in your main loop.
 ---
 
 ---
+
+---
+
+## What's new in v0.5.2
+
+**Fix: injected notices no longer make DSH refuse to load the session history.**
+
+Every message this plugin injects (memory recall, the always-on preference snapshot, checkpoint and nudge notices) is tagged `source.form: 'notice'`. DSH's released-v0 session format requires a `notice` source to also carry a string `summary`; this plugin never set it. Harnesses up to `0.1.0-rc.x` did not validate that field, so the logs looked fine — but **DSH `0.1.5-rc.2` added a v0→v1 migration that validates every event on load and refuses the entire log**:
+
+```
+failed to observe session "session-…": @deepseek-ai/dsh-session-format-v0-to-v1
+refuses this format v0 Session: user/message 10 source summary must be a string
+```
+
+The result is `历史加载失败` / "history failed to load" on every conversation this plugin ever injected into — which, with Tier 1 always-on, is effectively all of them.
+
+- All 8 injection sites now set a short `source.summary`. No behaviour, config, or API change; the summary is metadata DSH shows when a notice is collapsed.
+- **Upgrading fixes new sessions only.** Logs already written are still on disk with the missing field, and the harness still refuses them. To repair those, see below.
+
+### Repairing session logs written by v0.5.1 and earlier
+
+`scripts/repair-session-logs.mjs` rewrites the offending events in place. Stop the harness first, then:
+
+```bash
+# see what would change, without writing
+node scripts/repair-session-logs.mjs --all ~/.dsh/sessions --dry
+
+# repair in place (each modified log is backed up to <file>.bak.<timestamp>)
+node scripts/repair-session-logs.mjs --all ~/.dsh/sessions
+```
+
+Requires **Node ≥ 22** — it needs the zstd support in `node:zlib` that Node 20 lacks. Use the same runtime your harness runs on (e.g. `~/.local/node22/bin/node`).
+
+It is safe to re-run: repairs are idempotent, event count and `seq` numbering are preserved exactly (a session log's `seq` is dense, so nothing is ever deleted — only rewritten), and the concatenated-zstd-frame container layout is kept intact. The script self-verifies its own product and refuses to write if anything is off.
+
+Besides the missing `summary`, it also repairs two unrelated refusals in the same pass, in case your logs have them: unknown historical event types written by other plugins (rewritten to a known no-op type, original payload preserved as text — note that DSH `0.1.5-rc.2` no longer accepts these even when marked `ignorable`), and `subagent/descriptor` events still on version 2.
 
 ---
 
