@@ -79,6 +79,24 @@ interface EvolveState {
   }
 }
 
+/** A CONFLICT/PARTIAL operation waiting for a human decision. */
+interface FrozenOperation {
+  opId: string
+  kind: string
+  phase: string
+  targetName: string | null
+  conflict: { code?: string; message?: string; resources?: string[] } | null
+  observedConflictHash: string | null
+  resolution: { status: string; decision?: string | null }
+  updatedAt: string
+}
+
+interface SkillArchive {
+  archiveId: string
+  logicalSkillName: string
+  archivedAt?: string
+}
+
 async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(path)
   if (!res.ok) throw new Error(`${path} -> ${res.status}`)
@@ -174,6 +192,79 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
   },[refresh])
 
   // ── v0.4.2 controlled prune ──
+  const [frozenOps, setFrozenOps] = useState<FrozenOperation[]>([])
+  const [archives, setArchives] = useState<SkillArchive[]>([])
+  const loadOperations = useCallback(async () => {
+    try {
+      const r = await apiGet<{ operations: FrozenOperation[] }>(`${API}/operations`)
+      setFrozenOps(r.operations ?? [])
+    } catch { /* the panel is advisory; a failure must not blank the page */ }
+  }, [])
+  const loadArchives = useCallback(async () => {
+    try {
+      const r = await apiGet<{ archives: SkillArchive[] }>(`${API}/skills/archives`)
+      setArchives(r.archives ?? [])
+    } catch { /* same */ }
+  }, [])
+  /**
+   * Resolve a frozen operation.
+   *
+   * observedConflictHash is sent back exactly as it was rendered, so a decision
+   * made against a conflict that has since changed is refused by the server
+   * rather than applied to a different state.
+   */
+  const resolveOp = useCallback(async (op: FrozenOperation, decision: string) => {
+    setSaving(true)
+    try {
+      const cap = await apiPost<{ capId: string }>(`${API}/capability/mint`, {
+        purpose: 'operation-resolve',
+        target: {
+          resolvesOpId: op.opId, resolvedKind: op.kind,
+          observedConflictHash: op.observedConflictHash, decision,
+        },
+      })
+      const r = await apiPost<{ ok: boolean; status: string; reason?: string }>(
+        `${API}/operations/${op.opId}/resolve`,
+        { decision, resolvedKind: op.kind, observedConflictHash: op.observedConflictHash, capId: cap.capId },
+      )
+      setNote(r.reason ? `${r.status}: ${r.reason}` : `✅ 操作 ${op.opId} 已${decision === 'ROLL_FORWARD' ? '前滚' : '回滚'}`)
+      await loadOperations()
+    } catch (e) { setNote(`❌ ${(e as Error).message}`) }
+    finally { setSaving(false) }
+  }, [loadOperations])
+  const restoreArchive = useCallback(async (a: SkillArchive) => {
+    setSaving(true)
+    try {
+      const cap = await apiPost<{ capId: string }>(`${API}/capability/mint`, {
+        purpose: 'skill-restore',
+        target: { archiveId: a.archiveId, logicalSkillName: a.logicalSkillName },
+      })
+      const r = await apiPost<{ ok: boolean; status: string; reason?: string; name?: string }>(
+        `${API}/skills/restore`,
+        { archiveId: a.archiveId, logicalSkillName: a.logicalSkillName, capId: cap.capId, opId: `restore_${Date.now().toString(36)}` },
+      )
+      setNote(r.reason ? `${r.status}: ${r.reason}` : `♻️ 已恢复 skill「${r.name ?? a.logicalSkillName}」`)
+      await loadArchives()
+    } catch (e) { setNote(`❌ ${(e as Error).message}`) }
+    finally { setSaving(false) }
+  }, [loadArchives])
+  const proposeRollback = useCallback(async (name: string) => {
+    setSaving(true)
+    try {
+      const cap = await apiPost<{ capId: string }>(`${API}/capability/mint`, {
+        purpose: 'rollback-proposal-create', target: { logicalSkillName: name },
+      })
+      const r = await apiPost<{ ok: boolean; status: string; reason?: string; proposalId?: string }>(
+        `${API}/skills/rollback-proposal`,
+        { name, capId: cap.capId, opId: `rbp_${Date.now().toString(36)}` },
+      )
+      // Deliberately a proposal, never a rollback: extracting over a live
+      // directory has to be reviewed before it runs.
+      setNote(r.reason ? `${r.status}: ${r.reason}` : `⏮️ 已生成回滚提案 ${r.proposalId}，请在上方提案列表审阅后应用`)
+      await refresh()
+    } catch (e) { setNote(`❌ ${(e as Error).message}`) }
+    finally { setSaving(false) }
+  }, [])
   const [prune, setPrune] = useState<PruneState | null>(null)
   const [selMem, setSelMem] = useState<Record<string, boolean>>({})
   const [preview, setPreview] = useState<{ planDigest: string; preview: Array<{ action: string; count: number; allowed: boolean; reason: string; requires?: string }> } | null>(null)
@@ -182,6 +273,11 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
     try { setPrune(await apiGet<PruneState>(`${API}/prune`)) } catch (e) { /* keep last */ }
   }, [])
   useEffect(() => { void refreshPrune(); const t = window.setInterval(() => { void refreshPrune() }, 8000); return () => window.clearInterval(t) }, [refreshPrune])
+  useEffect(() => {
+    void loadOperations(); void loadArchives()
+    const t = window.setInterval(() => { void loadOperations() }, 8000)
+    return () => window.clearInterval(t)
+  }, [loadOperations, loadArchives])
 
   const toggleMem = useCallback((id: string) => { setSelMem((m) => ({ ...m, [id]: !m[id] })) }, [])
 
@@ -321,6 +417,29 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
         <label style={{display:'block',marginTop:10}}><input type="checkbox" checked={cfg?.approvalPromptEnabled ?? false} disabled={saving} onChange={e=>void setConfig({approvalPromptEnabled:e.target.checked})}/> 对话内直接记忆为高价值 pending 时弹一次确认</label>
         <div style={dim}>仅覆盖开放对话中 memory_remember；后台 review 在 turn 结束后无法弹窗，仍到面板审核。每轮最多 <input type="number" min={0} max={10} value={cfg?.approvalPromptMaxPerTurn ?? 1} disabled={saving} onChange={e=>void setConfig({approvalPromptMaxPerTurn:Number(e.target.value)})} style={{width:48}}/> 次。</div>
       </div>
+      {frozenOps.length>0 ? <div style={{...box, borderColor:'#b45309'}}>
+        <b>⚠️ 卡住的操作（{frozenOps.length}）</b>
+        <div style={dim}>
+          这些操作没做完就中断了，需要你决定怎么处理。系统不会自己猜——它宁可停下来等人。
+          「前滚」= 认可已经生效的部分并把记账补完；「回滚」= 只在确认从未生效时才可用。
+        </div>
+        <table style={{width:'100%',marginTop:8,...mono}}><tbody>{frozenOps.map(op=><tr key={op.opId}>
+          <td style={{verticalAlign:'top'}}>{op.kind}</td>
+          <td style={{verticalAlign:'top'}}>{op.targetName ?? '—'}</td>
+          <td style={{verticalAlign:'top'}}>
+            {op.phase}
+            {op.conflict?.message ? <div style={{...dim,marginTop:2}}>{op.conflict.message}</div> : null}
+          </td>
+          <td style={{textAlign:'right',whiteSpace:'nowrap',verticalAlign:'top'}}>
+            {op.resolution?.status==='RESOLVED'
+              ? <span style={dim}>已处理（{op.resolution.decision}）</span>
+              : <>
+                  <button style={btnTiny} disabled={saving} onClick={()=>void resolveOp(op,'ROLL_FORWARD')}>前滚</button>{' '}
+                  <button style={btnTiny} disabled={saving} onClick={()=>void resolveOp(op,'ROLL_BACK')}>回滚</button>
+                </>}
+          </td>
+        </tr>)}</tbody></table>
+      </div> : null}
       {s?.proposals && s.proposals.length>0 ? <div style={box}>
         <b>Skill 提案审阅（{s.proposals.length}）</b><div style={dim}>模型只能生成提案，不能自行应用。目标被人改过时会转 stale，不覆盖新内容。</div>
         <table style={{width:'100%',marginTop:8,...mono}}><tbody>{s.proposals.map(p=><tr key={p.id}><td>{p.action}</td><td>{p.targetSkill}</td><td>{p.state}</td><td style={{textAlign:'right',whiteSpace:'nowrap'}}>{p.state==='pending'?<><button style={btnTiny} disabled={saving} onClick={()=>void proposalAction(p.id,'apply')}>应用</button>{' '}<button style={btnTiny} disabled={saving} onClick={()=>void proposalAction(p.id,'reject')}>拒绝</button></>:null}</td></tr>)}</tbody></table>
@@ -653,6 +772,22 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
       </div>
 
       {note ? <div style={box}><pre style={mono}>{note}</pre></div> : null}
+      {archives.length>0 ? <div style={box}>
+        <b>已归档的 skill（{archives.length}）</b>
+        <div style={dim}>
+          归档只是移出活动目录，文件都还在，可以随时恢复。同一个 skill 可以有多份归档，
+          按归档编号区分——恢复时挑你要的那一份，不会互相覆盖。
+        </div>
+        <table style={{width:'100%',marginTop:8,...mono}}><tbody>{archives.map(a=><tr key={a.archiveId}>
+          <td>{a.logicalSkillName}</td>
+          <td style={dim}>{a.archiveId}</td>
+          <td style={{textAlign:'right',whiteSpace:'nowrap'}}>
+            <button style={btnTiny} disabled={saving} onClick={()=>void restoreArchive(a)}>恢复</button>{' '}
+            <button style={btnTiny} disabled={saving} onClick={()=>void proposeRollback(a.logicalSkillName)}>提议回滚</button>
+          </td>
+        </tr>)}</tbody></table>
+      </div> : null}
+
     </div>
   )
 }
