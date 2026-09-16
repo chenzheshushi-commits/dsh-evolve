@@ -341,3 +341,67 @@ test('claiming refuses anything that is not an unclaimed skill of ours', async (
       'with no local identity there is nothing to bind to');
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+// ── backup is a precondition for rewrites, not for moves (plan 0A.7) ──────────
+
+test('backupSkill throws rather than returning quietly when tar is unavailable', async () => {
+  const skills = await import('../../lib/skills.js');
+  const root = mkdtempSync(join(tmpdir(), 'dsh-bk-'));
+  const savedPath = process.env.PATH;
+  try {
+    const skillsDir = join(root, 'skills');
+    mkdirSync(join(skillsDir, 'demo'), { recursive: true });
+    writeFileSync(join(skillsDir, 'demo', 'SKILL.md'), skillMd());
+
+    // With an empty PATH, tar cannot be found.
+    process.env.PATH = join(root, 'no-binaries-here');
+    assert.throws(() => skills.backupSkill(skillsDir, join(root, 'archived'), 'demo', 'refine'),
+      /./, 'a failed backup must be visible to the caller, not swallowed');
+  } finally {
+    process.env.PATH = savedPath;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('archive still works without tar, because it is a reversible move', async () => {
+  // Plan 0A.7 narrows fail-closed to the rewrite operations. archive changes no
+  // content, so refusing it when tar is missing would remove a safe capability
+  // for no gain -- moving the directory back IS the recovery path.
+  const skills = await import('../../lib/skills.js');
+  const root = mkdtempSync(join(tmpdir(), 'dsh-bk-'));
+  const savedPath = process.env.PATH;
+  try {
+    const skillsDir = join(root, 'skills');
+    const archiveDir = join(root, 'archived');
+    mkdirSync(join(skillsDir, 'demo'), { recursive: true });
+    writeFileSync(join(skillsDir, 'demo', 'SKILL.md'), skillMd());
+
+    const warnings = [];
+    process.env.PATH = join(root, 'no-binaries-here');
+    const out = skills.archiveSkill(skillsDir, archiveDir, 'demo',
+      { warn: (m) => warnings.push(String(m)) }, { ownerId: OWNER });
+
+    assert.equal(out.archived, true, `archive must not depend on tar: ${out.reason ?? ''}`);
+    assert.ok(existsSync(join(archiveDir, 'demo', 'SKILL.md')), 'and the skill is preserved');
+    assert.ok(warnings.some((w) => /backup/i.test(w)),
+      'the failed backup must still be reported -- a broken tar should not stay invisible');
+  } finally {
+    process.env.PATH = savedPath;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('the mutation throat fails closed on backup failure for rewrites only', () => {
+  // All handlers now enter skill-mutation.js, so the safety assertion belongs at
+  // that ONE choke point: refine/fold take a backup in the same try that returns
+  // a refusal; archive/restore are reversible moves and need no precondition.
+  const src = readFileSync(new URL('../../lib/skill-mutation.js', import.meta.url), 'utf8');
+  for (const op of ['refine', 'fold']) {
+    assert.match(src, new RegExp(`backupSkill\\(skillsDir, archiveDir, payload\\.name, '${op}'\\)`),
+      `${op} must back up inside the throat`);
+  }
+  assert.match(src, /mutation failed before publish/,
+    'a thrown backup must become a fail-closed refusal, not escape or continue');
+  assert.ok(!/catch \{ \/\* best-effort \*\/ \}/.test(src),
+    'the throat must never swallow a backup failure');
+});
