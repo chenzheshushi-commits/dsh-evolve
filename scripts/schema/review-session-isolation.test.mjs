@@ -41,7 +41,7 @@ function makeReviewer({ everyTurns = 5, maxChars = 12000 } = {}) {
   const stateFor = (session) => {
     let st = perSession.get(session);
     if (!st) {
-      st = { collector: new TurnSnapshotCollector({ maxChars }), lastReviewedTurn: 0 };
+      st = { collector: new TurnSnapshotCollector({ maxChars }), lastReviewedTurn: 0, stepCount: 1 };
       perSession.set(session, st);
     }
     return st;
@@ -51,21 +51,27 @@ function makeReviewer({ everyTurns = 5, maxChars = 12000 } = {}) {
     reviewed,
     add(session, role, text) { stateFor(session).collector.add(role, text); },
     peek(session) { return stateFor(session).collector.snapshot(); },
+    step(session) { stateFor(session).stepCount += 1; },
+    noStep(session) { stateFor(session).stepCount = 0; },
 
     /** What index.js does on turn/end. */
-    endTurn(session, turnNo, { reasonKind = 'done', initiator = null } = {}) {
+    endTurn(session, turnNo, { reasonKind = 'completed', initiator = null } = {}) {
       const st = stateFor(session);
       if (!st.collector.hasContent) return { consumed: '', reviewed: false };
 
       // Consume unconditionally, before any decision (fixes 4 and 5).
       const snapshot = st.collector.snapshot();
       st.collector.reset();
+      const stepCount = st.stepCount;
+      st.stepCount = 1;
 
       // Capture the initiator before going async (fixes 6).
       const capturedInitiator = initiator;
 
-      const endedBadly = reasonKind === 'error';
-      const due = !endedBadly && turnNo - st.lastReviewedTurn >= everyTurns;
+      const reviewable = reasonKind === 'completed' || reasonKind === 'interrupted';
+      const substantial = reasonKind === 'interrupted' || stepCount > 0;
+      const foreground = !initiator?.agent?.session || initiator.agent.session === session;
+      const due = reviewable && substantial && foreground && turnNo - st.lastReviewedTurn >= everyTurns;
       if (due) {
         st.lastReviewedTurn = turnNo;
         reviewed.push({ session, turnNo, snapshot, initiator: capturedInitiator });
@@ -234,6 +240,25 @@ test('index.js wires review state per session, not process-wide', async () => {
   assert.ok(!/currentInitiator\?\.\(\)/.test(insideAsync),
     'reading it inside the async task can pick up whichever session became current');
 
-  assert.match(src, /reason\?\.kind \?\? ''\) === 'error'/,
-    'a turn that ended in an error must not become a lesson');
+  assert.match(src, /reasonKind === 'completed' \|\| reasonKind === 'interrupted'/,
+    'only completed/interrupted turns may be reviewed');
+  assert.match(src, /const substantial = reasonKind === 'interrupted' \|\| stepCount > 0/,
+    'completed greetings must not spend a review call');
+  assert.match(src, /initiator\.agent\.session === session/,
+    'background/subagent initiators must not self-review');
+});
+
+test('S3: blocked/aborted/error skip, interrupted is reviewed', () => {
+  for (const bad of ['blocked','aborted','error']) { const r=makeReviewer({everyTurns:1}); r.add(sessionA,'user','work'); assert.equal(r.endTurn(sessionA,1,{reasonKind:bad}).reviewed,false,bad) }
+  const r=makeReviewer({everyTurns:1}); r.add(sessionA,'user','wrong path corrected'); assert.equal(r.endTurn(sessionA,1,{reasonKind:'interrupted'}).reviewed,true);
+});
+
+test('S3: a completed turn without any step is not substantial', () => {
+  const r=makeReviewer({everyTurns:1}); r.add(sessionA,'user','first substantial'); r.endTurn(sessionA,1);
+  r.add(sessionA,'user','hello only'); r.noStep(sessionA); assert.equal(r.endTurn(sessionA,2).reviewed,false);
+});
+
+test('S3: a background initiator cannot trigger self-review', () => {
+  const r=makeReviewer({everyTurns:1}); r.add(sessionA,'user','substantial');
+  assert.equal(r.endTurn(sessionA,1,{initiator:{agent:{session:sessionB}}}).reviewed,false);
 });

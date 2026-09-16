@@ -52,6 +52,7 @@ interface EvolveState {
     disposalMode: 'manual' | 'suggest' | 'tidy'
     disposalMinIdleDays: number; tidyMaxPerRun: number; idleMinutes: number
     skillProposalMode: 'inherit'|'manual'|'balanced'|'autonomous'; skillAutoMaxChars:number; skillMaxChars:number
+    approvalPromptEnabled:boolean; approvalPromptMaxPerTurn:number
   }
   models: ModelRow[]
   memoryStats: {
@@ -315,6 +316,8 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
           人工正文上限 <input type="number" min={1000} max={500000} value={cfg?.skillMaxChars ?? 40000} disabled={saving} onChange={e=>void setConfig({skillMaxChars:Number(e.target.value)})} style={{width:90}} /> 字；
           自动路径上限 <input type="number" min={1000} max={200000} value={cfg?.skillAutoMaxChars ?? 10000} disabled={saving} onChange={e=>void setConfig({skillAutoMaxChars:Number(e.target.value)})} style={{width:90}} /> 字。
         </div>
+        <label style={{display:'block',marginTop:10}}><input type="checkbox" checked={cfg?.approvalPromptEnabled ?? false} disabled={saving} onChange={e=>void setConfig({approvalPromptEnabled:e.target.checked})}/> 对话内直接记忆为高价值 pending 时弹一次确认</label>
+        <div style={dim}>仅覆盖开放对话中 memory_remember；后台 review 在 turn 结束后无法弹窗，仍到面板审核。每轮最多 <input type="number" min={0} max={10} value={cfg?.approvalPromptMaxPerTurn ?? 1} disabled={saving} onChange={e=>void setConfig({approvalPromptMaxPerTurn:Number(e.target.value)})} style={{width:48}}/> 次。</div>
       </div>
       {s?.proposals && s.proposals.length>0 ? <div style={box}>
         <b>Skill 提案审阅（{s.proposals.length}）</b><div style={dim}>模型只能生成提案，不能自行应用。目标被人改过时会转 stale，不覆盖新内容。</div>
