@@ -241,10 +241,17 @@ test('the workspace gets a .gitignore so runtime data stays out of git', async (
     assert.match(body, /does not protect the files on disk/,
       'the file must not imply this makes anything safe -- the real defence is not storing secrets');
 
-    // Never clobber a file the user may have edited.
-    writeFileSync(path, '# mine\n');
+    // Upgrade an existing file without clobbering user rules. v0.6.0 adds new
+    // runtime surfaces over time; returning early would leave upgraded installs
+    // tracking the exact jsonl/proposal files we now need ignored.
+    writeFileSync(path, '# mine\ncustom/\n');
     store._renderMirror();
-    assert.equal(readFileSync(path, 'utf8'), '# mine\n', 'an existing .gitignore must be left alone');
+    const upgraded = readFileSync(path, 'utf8');
+    assert.match(upgraded, /^# mine\ncustom\//,
+      'existing user rules must survive byte-for-byte at the front');
+    for (const entry of ['*.jsonl', 'skill-proposals/', '.evolve-owner.json', 'secret-incidents/']) {
+      assert.ok(upgraded.split('\n').includes(entry), `existing file must be upgraded with ${entry}`);
+    }
   } finally {
     rmSync(ws, { recursive: true, force: true });
   }
