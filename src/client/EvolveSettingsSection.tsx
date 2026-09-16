@@ -21,6 +21,8 @@ interface ModelRow { provider: string; model: string }
 interface PendingRow { id: string; kind: string; importance: number; content: string; sourceContext?: string }
 /** A memory the user threw away. Kept forever; restorable by hand. */
 interface RejectedRow { id: string; kind: string; importance: number; content: string; rejectedAt: string | null }
+/** Looks like ours but not bound to this installation; needs explicit claiming. */
+interface UnclaimedSkill { name: string; tag: string | null; version: string | null; createdAt: string | null }
 interface InjRow { id: string; kind: string; importance: number; injectionCount: number; content: string }
 interface TriageSkill { loaded: number; succeeded: number; errored: number }
 interface PruneMemCand {
@@ -58,6 +60,7 @@ interface EvolveState {
     rejected?: number
   }
   rejectedQueue?: RejectedRow[]
+  unclaimedSkills?: UnclaimedSkill[]
   skillStats: {
     counts: { active: number; stale: number; archived: number }
     triage?: { totalTurns: number; successes: number; failures: number; bySkill: Record<string, TriageSkill> } | { disabled: true }
@@ -145,6 +148,15 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
     try {
       const r = await apiPost<{ restored: number }>(`${API}/action`, { action: 'restore-rejected', ids: [id] })
       setNote(r.restored > 0 ? '↩️ 已恢复为待确认' : '未找到该记忆')
+      await refresh()
+    } catch (e) { setNote(String(e)) } finally { setSaving(false) }
+  }, [refresh])
+
+  const claimSkills = useCallback(async (names: string[]) => {
+    setSaving(true); setNote('')
+    try {
+      const r = await apiPost<{ claimed: number }>(`${API}/action`, { action: 'claim-legacy-skills', names })
+      setNote(r.claimed > 0 ? `✅ 已认领 ${r.claimed} 个 skill，此后可进入自动路径` : '没有可认领的 skill')
       await refresh()
     } catch (e) { setNote(String(e)) } finally { setSaving(false) }
   }, [refresh])
@@ -341,6 +353,41 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
               ))}
             </tbody>
           </table>
+        </div>
+      ) : null}
+
+      {/* ── Block 2.1b: 待认领 skill（ownership 绑定） ── */}
+      {s?.unclaimedSkills && s.unclaimedSkills.length > 0 ? (
+        <div style={box}>
+          <b>待认领 skill（{s.unclaimedSkills.length}）</b>
+          <div style={dim}>
+            这些 skill 看起来是本插件早期生成的，但没有绑定本机身份。为避免把你手写的文件
+            误当成插件资产，插件不会自动认领：认领后才会进入自动改写路径，未认领时手动工具照常可用。
+          </div>
+          <table style={{ width: '100%', marginTop: 8, ...mono }}>
+            <tbody>
+              {s.unclaimedSkills.map((k) => (
+                <tr key={k.name} style={{ verticalAlign: 'top' }}>
+                  <td style={{ whiteSpace: 'nowrap' }}>{k.name}</td>
+                  <td style={{ paddingLeft: 8, opacity: 0.6 }}>
+                    {k.tag ? `tag: ${k.tag}` : ''}{k.version ? ` · v${k.version}` : ''}
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
+                    <button style={btnTiny} disabled={saving} onClick={() => void claimSkills([k.name])} title="确认这是插件生成的 skill">
+                      认领
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <button
+            style={{ ...btn, marginTop: 10 }}
+            disabled={saving}
+            onClick={() => void claimSkills((s.unclaimedSkills ?? []).map((k) => k.name))}
+          >
+            全部认领（{s.unclaimedSkills.length}）
+          </button>
         </div>
       ) : null}
 

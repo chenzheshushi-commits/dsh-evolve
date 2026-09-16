@@ -51,12 +51,25 @@ const store = new MemoryStore(makeTable(), { workspaceDir: ws, config: cfg, logg
 // mock llm service for the models list (passed as a value, not via ctx)
 const llm = { listProviders: () => [{ id: 'p1' }], listModels: async () => [{ id: 'm1' }, { id: 'm2' }] };
 
+// Ownership claiming is a human action, so the route must exist and must refuse
+// anything that is not actually unclaimed.
+const unclaimedFixture = [
+  { name: 'legacy-one', tag: 'reverse-proxy', version: '1.0.0', createdAt: '2026-01-01T00:00:00Z' },
+]
+
 const routes = makeEvolveRoutes({
   store, llm,
   getConfig: () => cfg,
   setConfig: (patch) => { Object.assign(cfg, patch); },
   skillStates: () => ({ counts: { active: 0, stale: 0, archived: 0 }, triage: { disabled: true } }),
   getSuggestedDisposal: () => ({ candidates: store.disposalCandidates(), computedAt: Date.now(), mode: cfg.disposalMode }),
+  listUnclaimed: () => unclaimedFixture,
+  claimLegacy: (name) => {
+    const i = unclaimedFixture.findIndex((k) => k.name === name)
+    if (i < 0) return { claimed: false, reason: 'not unclaimed' }
+    unclaimedFixture.splice(i, 1)
+    return { claimed: true, name }
+  },
 });
 const R = routeMap(routes);
 assert.ok(R['/api/evolve/state'] && R['/api/evolve/action'], 'both routes present');
@@ -210,6 +223,31 @@ await store.remember({ content: '一条待确认记忆', kind: 'note', importanc
   // Leave the store clean for the tests that follow.
   await store.reject(seeded.id)
   console.log('OK web U1: reject leaves the queue but not the disk, confirm-all cannot undo it, restore works')
+}
+
+// P2: legacy ownership claiming end to end.
+{
+  const st = mockRes()
+  await R['/api/evolve/state'].handler(mockReq({ method: 'GET' }), st)
+  const body = JSON.parse(st.body)
+  assert.equal(body.unclaimedSkills.length, 1,
+    '/state must surface unclaimed skills or nobody knows to claim them')
+
+  let res = mockRes()
+  await R['/api/evolve/action'].handler(mockReq({ method: 'POST', body: { action: 'claim-legacy-skills', names: [] } }), res)
+  assert.equal(res.statusCode, 400, 'an empty list is a client bug, not a silent no-op')
+
+  res = mockRes()
+  await R['/api/evolve/action'].handler(mockReq({ method: 'POST', body: { action: 'claim-legacy-skills', names: ['legacy-one'] } }), res)
+  assert.equal(res.statusCode, 200)
+  assert.equal(JSON.parse(res.body).claimed, 1, 'claiming an unclaimed skill succeeds')
+
+  res = mockRes()
+  await R['/api/evolve/action'].handler(mockReq({ method: 'POST', body: { action: 'claim-legacy-skills', names: ['legacy-one'] } }), res)
+  const again = JSON.parse(res.body)
+  assert.equal(again.claimed, 0, 'claiming twice must not report success')
+  assert.equal(again.refused.length, 1, 'and it must say why')
+  console.log('OK web P2: unclaimed skills are visible, claiming is explicit and not repeatable')
 }
 
 // ── v0.4.2 prune routes: fence + preview->execute + plan-expired ────────────
