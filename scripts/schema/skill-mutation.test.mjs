@@ -189,20 +189,73 @@ test('protocol-D move refuses EXDEV and never copy+deletes', () => {
   assert.equal(/existsSync\(dst\)\) rmSync/.test(archive), false);
 });
 
-test('REAL index.js has zero direct low-level mutation calls', () => {
+test('REAL index.js reaches the filesystem only through the transaction layer', () => {
   const src = readFileSync(new URL('../../lib/index.js', import.meta.url), 'utf8');
-  const forbidden = [
-    'writeCrystallizedSkill(', 'refineCrystallizedSkill(', 'foldSkillBody(',
-    'archiveSkill(', 'restoreSkill(', 'restoreFromBackup(',
+  // Checked at the import face rather than by scanning for call text: a name that
+  // was never imported cannot be called, and this cannot be defeated by aliasing
+  // or by reformatting a call across lines.
+  const imports = [...src.matchAll(/^import\s+(?:([\w*\s{},]+?)\s+from\s+)?['"]([^'"]+)['"];?$/gm)]
+    .map((m) => ({ names: (m[1] ?? '').replace(/[{}]/g, ' '), from: m[2] }));
+  const writers = [
+    'writeCrystallizedSkill', 'refineCrystallizedSkill', 'foldSkillBody',
+    'archiveSkill', 'restoreSkill', 'restoreFromBackup', 'applySkillMutation',
   ];
-  for (const call of forbidden) {
-    assert.equal(src.includes(call), false,
-      `${call} in index.js is a bypass -- tools, web and turn/end must call applySkillMutation`);
+  for (const { names, from } of imports) {
+    for (const w of writers) {
+      assert.equal(new RegExp(`\\b${w}\\b`).test(names), false,
+        `index.js imports ${w} from ${from}; every mutation must go through `
+        + 'lib/skill-operations.js so it gets a manifest, a WAL and recovery');
+    }
   }
-  assert.ok((src.match(/applySkillMutation\(\{/g) ?? []).length >= 7,
-    'direct-write, web-apply, web-prune and turn/end paths must visibly enter the throat');
+  // And the transaction layer is genuinely in use, not merely imported.
+  assert.match(src, /new SkillOperations\(\{/, 'the transaction service must be constructed');
+  assert.ok((src.match(/skillTx\.\w+\(/g) ?? []).length >= 10,
+    'tools, web apply, web prune and turn/end must all publish through the service');
   assert.ok((src.match(/mutationOrProposal\(/g) ?? []).length >= 4,
-    'proposal-first model tools must enter the same throat after Web approval');
+    'proposal-first model tools must keep entering the same authorization gate');
+});
+
+test('the transaction layer authorizes through applySkillMutation, never around it', () => {
+  const src = readFileSync(new URL('../../lib/skill-operations.js', import.meta.url), 'utf8');
+  assert.match(src, /import \{ applySkillMutation \}/,
+    'skill-operations.js is where authorization is consulted');
+  assert.match(src, /dryRun: true/,
+    'authorization must run as a dry run so the verdict and the write cannot diverge');
+  // Publishing happens in the protocols; a direct low-level writer call inside the
+  // service would skip the WAL and the single commit point.
+  for (const w of ['writeCrystallizedSkill(', 'refineCrystallizedSkill(', 'foldSkillBody(']) {
+    assert.equal(src.includes(w), false,
+      `${w} inside the service would publish outside a protocol`);
+  }
+});
+
+test('a dry run authorizes without touching the filesystem', () => {
+  const e = env();
+  try {
+    const before = readdirSync(e.skillsDir);
+    const verdict = applySkillMutation({
+      ...e, action: 'crystallize', source: 'autonomous-tool', dryRun: true,
+      payload: { name: 'dry-run-probe', tag: 'probe', records: evidence('probe'), body: '# body' },
+    });
+    assert.equal(verdict.ok, true, verdict.reason ?? 'dry run should authorize');
+    assert.equal(verdict.dryRun, true, 'the caller must be able to tell a verdict from a write');
+    assert.deepEqual(readdirSync(e.skillsDir), before,
+      'a dry run that created a directory would mean the authorization step writes');
+  } finally { rmSync(e.root, { recursive: true, force: true }); }
+});
+
+test('a dry run still refuses what the real call would refuse', () => {
+  const e = env();
+  try {
+    create(e, 'owned-elsewhere', 'owned-elsewhere', 'b'.repeat(32));
+    const verdict = applySkillMutation({
+      ...e, action: 'refine', source: 'autonomous-tool', dryRun: true,
+      payload: { name: 'owned-elsewhere', tag: 'owned-elsewhere', records: evidence('x') },
+    });
+    assert.equal(verdict.ok, false,
+      'a dry run that says yes where the real call says no would make the '
+      + 'transaction layer publish changes authorization rejected');
+  } finally { rmSync(e.root, { recursive: true, force: true }); }
 });
 
 test('skill_style boundary stays outside because it never touches SKILL.md', () => {
