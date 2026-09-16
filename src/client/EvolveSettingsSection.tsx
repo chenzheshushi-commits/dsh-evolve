@@ -141,7 +141,8 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
   const rejectOne = useCallback(async (id: string) => {
     setSaving(true); setNote('')
     try {
-      const r = await apiPost<{ rejected: number }>(`${API}/action`, { action: 'reject-batch', ids: [id] })
+      const cap=await apiPost<{capId:string}>(`${API}/capability/mint`,{purpose:'memory-discard',target:{ids:[id]}})
+      const r = await apiPost<{ rejected: number }>(`${API}/memory/discard`, { ids: [id], capId:cap.capId, opId:`discard_${Date.now().toString(36)}` })
       setNote(r.rejected > 0 ? '🗑️ 已丢弃（可在下方「已拒绝」区恢复）' : '未找到该记忆')
       await refresh()
     } catch (e) { setNote(String(e)) } finally { setSaving(false) }
@@ -150,7 +151,8 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
   const restoreOne = useCallback(async (id: string) => {
     setSaving(true); setNote('')
     try {
-      const r = await apiPost<{ restored: number }>(`${API}/action`, { action: 'restore-rejected', ids: [id] })
+      const cap=await apiPost<{capId:string}>(`${API}/capability/mint`,{purpose:'memory-restore-rejected',target:{ids:[id]}})
+      const r = await apiPost<{ restored: number }>(`${API}/memory/restore-rejected`, { ids: [id], capId:cap.capId, opId:`restore_${Date.now().toString(36)}` })
       setNote(r.restored > 0 ? '↩️ 已恢复为待确认' : '未找到该记忆')
       await refresh()
     } catch (e) { setNote(String(e)) } finally { setSaving(false) }

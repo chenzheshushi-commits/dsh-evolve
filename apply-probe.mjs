@@ -109,7 +109,9 @@ assert.ok(registered.routes.includes('/api/evolve/proposals/'), 'proposal prefix
 assert.ok(registered.routes.includes('/api/evolve/capability/mint'), 'capability mint route registered');
 assert.ok(registered.routes.includes('/api/evolve/quarantine'), 'quarantine list route registered');
 assert.ok(registered.routes.includes('/api/evolve/quarantine/'), 'quarantine action route registered');
-assert.equal(registered.routes.length, 10, `exactly 10 routes (got ${registered.routes.length})`);
+assert.ok(registered.routes.includes('/api/evolve/memory/discard'));
+assert.ok(registered.routes.includes('/api/evolve/memory/restore-rejected'));
+assert.equal(registered.routes.length, 12, `exactly 12 routes (got ${registered.routes.length})`);
 
 rmSync(home, { recursive: true, force: true });
 console.log('OK apply() probe:');
