@@ -19,3 +19,6 @@ _EVAL_PENDING.md
 # Python bytecode from scripts/schema/ contracts
 __pycache__/
 *.py[cod]
+
+# Packed tarballs from `pnpm pack` -- build output, not source
+*.tgz
