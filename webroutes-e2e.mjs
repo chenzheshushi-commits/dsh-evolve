@@ -170,6 +170,48 @@ await store.remember({ content: '一条待确认记忆', kind: 'note', importanc
   console.log('OK web confirm-batch: confirmed 1, pending queue drained');
 }
 
+// U1 discard channel end to end: reject -> gone from the queue and from /state's
+// active view, still on disk, then restore puts it back.
+{
+  const seeded = await store.remember({
+    content: 'wrongly captured detail that the user does not want kept',
+    kind: 'other', scope: 'user', importance: 1, tags: ['pending'],
+  })
+  assert.ok(seeded, 'seeded a pending memory to discard')
+
+  let res = mockRes()
+  await R['/api/evolve/action'].handler(mockReq({ method: 'POST', body: { action: 'reject-batch', ids: [seeded.id] } }), res)
+  assert.equal(res.statusCode, 200, 'reject-batch 200')
+  assert.equal(JSON.parse(res.body).rejected, 1, 'reject-batch rejected 1')
+  assert.equal(store.list({ pending: true }).length, 0, 'the discarded memory left the pending queue')
+  assert.ok(store.table.get(seeded.id), 'but it is NOT physically deleted')
+
+  const st1 = mockRes()
+  await R['/api/evolve/state'].handler(mockReq({ method: 'GET' }), st1)
+  const b1 = JSON.parse(st1.body)
+  assert.equal(b1.rejectedQueue.length, 1, '/state exposes the discard pile so it can be restored')
+  assert.equal(b1.memoryStats.pendingQueue.length, 0, 'and it is absent from the pending queue')
+
+  // confirm-batch must not resurrect it -- that was the whole bug.
+  res = mockRes()
+  await R['/api/evolve/action'].handler(mockReq({ method: 'POST', body: { action: 'confirm-batch' } }), res)
+  assert.equal(JSON.parse(res.body).confirmed, 0, 'confirm-all cannot sweep up a discarded memory')
+
+  res = mockRes()
+  await R['/api/evolve/action'].handler(mockReq({ method: 'POST', body: { action: 'restore-rejected', ids: [seeded.id] } }), res)
+  assert.equal(JSON.parse(res.body).restored, 1, 'restore-rejected restored 1')
+  assert.equal(store.list({ pending: true }).length, 1, 'it is back in the review queue')
+
+  // Empty ids is a client bug, not a silent no-op.
+  res = mockRes()
+  await R['/api/evolve/action'].handler(mockReq({ method: 'POST', body: { action: 'reject-batch', ids: [] } }), res)
+  assert.equal(res.statusCode, 400, 'reject-batch with no ids -> 400')
+
+  // Leave the store clean for the tests that follow.
+  await store.reject(seeded.id)
+  console.log('OK web U1: reject leaves the queue but not the disk, confirm-all cannot undo it, restore works')
+}
+
 // ── v0.4.2 prune routes: fence + preview->execute + plan-expired ────────────
 {
   // build a real prune controller via the exported wiring path is internal to

@@ -19,6 +19,8 @@ const API = '/api/evolve'
 
 interface ModelRow { provider: string; model: string }
 interface PendingRow { id: string; kind: string; importance: number; content: string; sourceContext?: string }
+/** A memory the user threw away. Kept forever; restorable by hand. */
+interface RejectedRow { id: string; kind: string; importance: number; content: string; rejectedAt: string | null }
 interface InjRow { id: string; kind: string; importance: number; injectionCount: number; content: string }
 interface TriageSkill { loaded: number; succeeded: number; errored: number }
 interface PruneMemCand {
@@ -53,7 +55,9 @@ interface EvolveState {
     byKind: Record<string, number>
     topByInjection: InjRow[]
     pendingQueue: PendingRow[]
+    rejected?: number
   }
+  rejectedQueue?: RejectedRow[]
   skillStats: {
     counts: { active: number; stale: number; archived: number }
     triage?: { totalTurns: number; successes: number; failures: number; bySkill: Record<string, TriageSkill> } | { disabled: true }
@@ -88,6 +92,7 @@ const btn: React.CSSProperties = { padding: '6px 12px', borderRadius: 6, border:
 const btnPrimary: React.CSSProperties = { ...btn, background: 'var(--dsh-accent, #2563eb)', color: '#fff', border: 'none' }
 const mono: React.CSSProperties = { fontFamily: 'ui-monospace, monospace', fontSize: 12 }
 const dim: React.CSSProperties = { opacity: 0.7, fontSize: 13 }
+const btnTiny: React.CSSProperties = { ...btn, padding: '2px 8px', fontSize: 11, marginRight: 0 }
 
 interface OwnerProps { close: () => void }
 
@@ -119,6 +124,27 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
     try {
       const r = await apiPost<{ confirmed: number }>(`${API}/action`, { action: 'confirm-batch' })
       setNote(`✅ 已批量确认 ${r.confirmed} 条 pending 记忆`)
+      await refresh()
+    } catch (e) { setNote(String(e)) } finally { setSaving(false) }
+  }, [refresh])
+
+  // U1: the discard channel. Without it the queue could only grow -- a wrongly
+  // captured memory could be confirmed or ignored, nothing else -- and once it
+  // hit maxPendingQueue new memories were dropped at the door.
+  const rejectOne = useCallback(async (id: string) => {
+    setSaving(true); setNote('')
+    try {
+      const r = await apiPost<{ rejected: number }>(`${API}/action`, { action: 'reject-batch', ids: [id] })
+      setNote(r.rejected > 0 ? '🗑️ 已丢弃（可在下方「已拒绝」区恢复）' : '未找到该记忆')
+      await refresh()
+    } catch (e) { setNote(String(e)) } finally { setSaving(false) }
+  }, [refresh])
+
+  const restoreOne = useCallback(async (id: string) => {
+    setSaving(true); setNote('')
+    try {
+      const r = await apiPost<{ restored: number }>(`${API}/action`, { action: 'restore-rejected', ids: [id] })
+      setNote(r.restored > 0 ? '↩️ 已恢复为待确认' : '未找到该记忆')
       await refresh()
     } catch (e) { setNote(String(e)) } finally { setSaving(false) }
   }, [refresh])
@@ -277,6 +303,11 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
                         </div>
                       ) : null}
                     </td>
+                    <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
+                      <button style={btnTiny} disabled={saving} onClick={() => void rejectOne(r.id)} title="丢弃这条（可恢复，不会物理删除）">
+                        丢弃
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -287,6 +318,31 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
           </>
         ) : <div style={{ ...dim, marginTop: 8 }}>（无待确认记忆）</div>}
       </div>
+
+      {/* ── Block 2.1: 已拒绝（U1 的恢复入口） ── */}
+      {s?.rejectedQueue && s.rejectedQueue.length > 0 ? (
+        <div style={box}>
+          <b>已拒绝（{s.rejectedQueue.length}）</b>
+          <div style={dim}>
+            丢弃的记忆不再注入、不占待确认额度、批量确认也不会收回；但不会被物理删除，随时可恢复。
+          </div>
+          <table style={{ width: '100%', marginTop: 8, ...mono }}>
+            <tbody>
+              {s.rejectedQueue.map((r) => (
+                <tr key={r.id} style={{ verticalAlign: 'top' }}>
+                  <td style={{ opacity: 0.6, whiteSpace: 'nowrap' }}>[{r.kind}/imp{r.importance}]</td>
+                  <td style={{ paddingLeft: 8 }}>{r.content}</td>
+                  <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
+                    <button style={btnTiny} disabled={saving} onClick={() => void restoreOne(r.id)} title="放回待确认队列">
+                      恢复
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
 
       {/* ── Block 2.2: 检索健康度 (v0.5.0 R5) ── */}
       {s?.retrieval ? (
