@@ -45,10 +45,10 @@
   },
   "scripts": {
     "build": "tsdown && node scripts/wrap-client.mjs",
-    "test": "node --test scripts/schema/conformance.test.mjs scripts/schema/op-registry.test.mjs && node smoke.mjs && node apply-probe.mjs && node webroutes-e2e.mjs",
+    "test": "node --test scripts/schema/conformance.test.mjs scripts/schema/op-registry.test.mjs scripts/schema/op-transaction.test.mjs && node smoke.mjs && node apply-probe.mjs && node webroutes-e2e.mjs",
     "test:baseline": "node baseline/retrieval-baseline.mjs && node baseline/r6-threshold-drift.mjs",
     "typecheck": "tsc --noEmit",
-    "test:contracts": "python3 scripts/schema/verify_op_manifest_schema.py && python3 scripts/schema/test_tree_hash_regression.py && node --test scripts/schema/conformance.test.mjs scripts/schema/op-registry.test.mjs"
+    "test:contracts": "python3 scripts/schema/verify_op_manifest_schema.py && python3 scripts/schema/test_tree_hash_regression.py && node --test scripts/schema/conformance.test.mjs scripts/schema/op-registry.test.mjs scripts/schema/op-transaction.test.mjs"
   },
   "dsh": {
     "bundle": {
