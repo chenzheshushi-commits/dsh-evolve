@@ -111,7 +111,33 @@ assert.ok(registered.routes.includes('/api/evolve/quarantine'), 'quarantine list
 assert.ok(registered.routes.includes('/api/evolve/quarantine/'), 'quarantine action route registered');
 assert.ok(registered.routes.includes('/api/evolve/memory/discard'));
 assert.ok(registered.routes.includes('/api/evolve/memory/restore-rejected'));
-assert.equal(registered.routes.length, 12, `exactly 12 routes (got ${registered.routes.length})`);
+// v0.6.0 skill operations + operator resolution.
+assert.ok(registered.routes.includes('/api/evolve/skills/archives'), 'archive list route registered');
+assert.ok(registered.routes.includes('/api/evolve/skills/'), 'skill ops action route registered');
+assert.ok(registered.routes.includes('/api/evolve/operations'), 'frozen operation list route registered');
+assert.ok(registered.routes.includes('/api/evolve/operations/'), 'operation resolve route registered');
+// Pinned as an exact SET, not a count. A count catches an accidental addition but
+// says nothing about which route appeared, and it silently passes when one route
+// is removed while another is added -- the case where a privileged endpoint could
+// go missing unnoticed.
+assert.deepEqual([...registered.routes].sort(), [
+  '/api/evolve/action',
+  '/api/evolve/capability/mint',
+  '/api/evolve/memory/discard',
+  '/api/evolve/memory/restore-rejected',
+  '/api/evolve/operations',
+  '/api/evolve/operations/',
+  '/api/evolve/proposals',
+  '/api/evolve/proposals/',
+  '/api/evolve/prune',
+  '/api/evolve/prune/execute',
+  '/api/evolve/prune/preview',
+  '/api/evolve/quarantine',
+  '/api/evolve/quarantine/',
+  '/api/evolve/skills/',
+  '/api/evolve/skills/archives',
+  '/api/evolve/state',
+].sort(), 'the registered route set must match exactly');
 
 rmSync(home, { recursive: true, force: true });
 console.log('OK apply() probe:');
