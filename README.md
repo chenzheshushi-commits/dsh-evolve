@@ -19,7 +19,7 @@ mechanisms and rules. Everything it learns is local to your install and never le
 | **Node.js >= 22.5.0** | Uses the built-in `node:sqlite` module for FTS5 full-text search. Node 20 will not work. |
 | **DeepSeek Harness** `0.1.0-rc.7`+ | Host platform. Provides tools, storage, LLM, and (optionally) the web server. |
 | `git` on PATH *(optional)* | Enables automatic memory checkpoints you can roll back. Without it, checkpoints are skipped. |
-| `tar` on PATH *(optional)* | Enables pre-operation skill backups and `skill_rollback`. Without it, backups are skipped. |
+| `tar` on PATH | Required for skill rewrites that need a rollback snapshot. A failed backup aborts refine/fold instead of risking an unrecoverable overwrite. |
 | Linux / macOS | Developed and tested here. Windows is untested — path handling is platform-neutral, but `git`/`tar` availability differs. |
 
 Degradation is graceful by design: if SQLite/FTS5 is unavailable the plugin falls back to
@@ -39,7 +39,7 @@ dsh plugin --profile web add github:chenzheshushi-commits/dsh-evolve
 Pin a specific release instead of tracking `main`:
 
 ```bash
-dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.5.2/dsh-evolve-0.5.2.tgz"
+dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.6.0/dsh-evolve-0.6.0.tgz"
 ```
 
 Then restart the harness — tools are discovered at startup, not hot-reloaded.
@@ -95,9 +95,9 @@ High-value lessons sharing a tag crystallize into a `SKILL.md`. New evidence **r
 existing skill in place** — versioned, with your hand edits preserved — instead of spawning a
 near-duplicate.
 
-Curation runs a real lifecycle: `active` → `stale` (idle N days) → `archived`. Archiving moves a
-skill out of the active catalog and is fully reversible. **Nothing is ever deleted.** A backup is
-taken before every mutating operation, so a bad refine or a hasty archive can be rolled back.
+Curation runs a real lifecycle: `active` → `stale` → `archived`. Archiving moves a skill out of
+the active catalog and is reversible. Content rewrites require a successful backup first; archive
+and restore are reversible directory moves. The plugin never automatically physically deletes assets.
 
 ### Anti-bloat convergence
 The half most memory systems skip.
@@ -189,6 +189,71 @@ behavior on failure. Nothing runs in your main loop.
 ---
 
 ---
+
+---
+
+## What's new in v0.6.0 — Tidy memory and governed skill evolution
+
+v0.6.0 adds the missing safety half of self-evolution: automation may act, but every
+non-trivial write has a deterministic boundary and a recovery path.
+
+- **Tidy disposal tier.** `manual | suggest | tidy` now share one eligibility rule.
+  Tidy automatically soft-deletes at most `tidyMaxPerRun` ordinary, low-importance
+  memories that have never been recalled or injected and have passed the cool-off.
+  Pinned, importance-3, preference, decision, pending and rejected records are
+  never automatic subjects. Soft-deleted records remain visible and restorable.
+  **No tier physically deletes memory. Tombstone GC is not part of v0.6.0.**
+- **Skill proposals.** In manual and balanced modes, crystallize/refine/fold/converge
+  create a proposal instead of changing the live catalog. The settings page is the
+  only apply/reject surface; model tools cannot approve their own work. Select an
+  explicit autonomous `skillProposalMode` if you want immediate writes after all
+  safety checks.
+- **Stale and ownership protection.** Proposal apply binds independent SHA-256
+  hashes for prose and semantic state. Any human edit or competing mutation makes
+  the proposal stale with zero overwrite. Skills are bound to a random per-install
+  owner id; legacy skills require an explicit claim in the Web panel.
+- **One mutation throat.** Model tools, Web actions, rollback and automatic archive
+  all pass structured ownership, policy, size, secret, backup and receipt gates.
+  Automatic skill bodies are capped at 10,000 characters; human paths at 40,000
+  by default. An already oversized skill can only be rewritten smaller.
+- **Secret persistence guard.** Strong GitHub/AWS/OpenAI/Anthropic/Slack/Bearer/PEM
+  patterns are blocked before memory, skill, mirror or Git persistence. Source
+  context and audit fields are redacted; incidents store only hashes and masked
+  snippets, never the original token. Ordinary prose about “password” or “token”
+  remains valid knowledge.
+- **Objective background review.** Review requires substantial foreground work.
+  Completed/interrupted turns qualify; error/blocked/aborted turns do not. State is
+  isolated per session, and successful skill-tool use issues short-lived,
+  single-use receipts for autonomous refine/fold/converge.
+- **Optional turn-open approval.** When enabled, a direct high-value
+  `memory_remember` can ask yes/no inside the active turn. This deliberately does
+  **not** cover background review: that runs after `turn/end`, where DSH forbids an
+  approval request. Background suggestions continue to use the settings review
+  queue. The popup is off by default and limited to one per turn by default.
+- **Web replay protection.** Proposal apply/reject uses short-lived, same-origin,
+  single-use capabilities. This is CSRF/replay protection and an audit anchor; it
+  is not presented as proof that a human clicked.
+
+Operational boundaries:
+
+- Multiple processes sharing one evolve workspace are unsupported; use one DSH
+  instance per workspace.
+- There is an unavoidable, very small POSIX window between the final stale check
+  and atomic rename. Do not hand-edit the same skill while an apply is in flight.
+- The plugin still ships blank; no memory, proposal, incident or owner id is in the
+  package. Runtime JSONL/proposal/operation files are excluded from workspace Git.
+
+### New configuration
+
+| Key | Default | Effect |
+|---|---:|---|
+| `disposalMode` | `manual` | `manual`, `suggest`, or recoverable `tidy` |
+| `tidyMaxPerRun` | `5` | Maximum automatic soft-deletes per idle run |
+| `idleMinutes` | `5` | Idle delay for suggest/tidy |
+| `skillProposalMode` | `inherit` | Follow memory approval mode or explicitly select a skill mode |
+| `skillAutoMaxChars` / `skillMaxChars` | `10000` / `40000` | Automatic/human skill-body limits |
+| `approvalPromptEnabled` | `false` | Ask in-turn for direct high-value memory writes |
+| `approvalPromptMaxPerTurn` | `1` | Popup budget per session turn |
 
 ---
 

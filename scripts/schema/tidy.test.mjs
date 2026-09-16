@@ -184,4 +184,8 @@ test('no physical delete exists in tidy implementation', () => {
   assert.match(src, /softForgetIfEligible/);
   assert.equal(/\.forget\(|\.delete\(|rmSync|unlink/.test(src), false,
     'tidy may only stamp forgottenAt; physical deletion is forbidden at every tier');
+  const index = readFileSync(new URL('../../lib/index.js', import.meta.url), 'utf8');
+  const block = index.slice(index.indexOf("name: 'memory_forget'"), index.indexOf("name: 'crystallize_skill'"));
+  assert.match(block, /store\.softForget\(/, 'conversation-side memory_forget must be recoverable too');
+  assert.equal(/store\.forget\(/.test(block), false);
 });
