@@ -104,7 +104,9 @@ assert.ok(registered.routes.includes('/api/evolve/action'), 'route /api/evolve/a
 assert.ok(registered.routes.includes('/api/evolve/prune'), 'route /api/evolve/prune registered');
 assert.ok(registered.routes.includes('/api/evolve/prune/preview'), 'route /api/evolve/prune/preview registered');
 assert.ok(registered.routes.includes('/api/evolve/prune/execute'), 'route /api/evolve/prune/execute registered');
-assert.equal(registered.routes.length, 5, `exactly 5 routes (got ${registered.routes.length})`);
+assert.ok(registered.routes.includes('/api/evolve/proposals'), 'proposal list route registered');
+assert.ok(registered.routes.includes('/api/evolve/proposals/'), 'proposal prefix action route registered');
+assert.equal(registered.routes.length, 7, `exactly 7 routes (got ${registered.routes.length})`);
 
 rmSync(home, { recursive: true, force: true });
 console.log('OK apply() probe:');

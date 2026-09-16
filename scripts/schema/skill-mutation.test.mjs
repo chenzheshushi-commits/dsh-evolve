@@ -189,8 +189,10 @@ test('REAL index.js has zero direct low-level mutation calls', () => {
     assert.equal(src.includes(call), false,
       `${call} in index.js is a bypass -- tools, web and turn/end must call applySkillMutation`);
   }
-  assert.ok((src.match(/applySkillMutation\(\{/g) ?? []).length >= 10,
-    'the model tools, web paths and turn/end auto archive must visibly enter the throat');
+  assert.ok((src.match(/applySkillMutation\(\{/g) ?? []).length >= 7,
+    'direct-write, web-apply, web-prune and turn/end paths must visibly enter the throat');
+  assert.ok((src.match(/mutationOrProposal\(/g) ?? []).length >= 4,
+    'proposal-first model tools must enter the same throat after Web approval');
 });
 
 test('skill_style boundary stays outside because it never touches SKILL.md', () => {

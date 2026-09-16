@@ -23,6 +23,7 @@ interface PendingRow { id: string; kind: string; importance: number; content: st
 interface RejectedRow { id: string; kind: string; importance: number; content: string; rejectedAt: string | null }
 /** Looks like ours but not bound to this installation; needs explicit claiming. */
 interface UnclaimedSkill { name: string; tag: string | null; version: string | null; createdAt: string | null }
+interface SkillProposal { id:string; action:string; targetSkill:string; state:string; createdAt:string; description?:string }
 interface InjRow { id: string; kind: string; importance: number; injectionCount: number; content: string }
 interface TriageSkill { loaded: number; succeeded: number; errored: number }
 interface PruneMemCand {
@@ -50,6 +51,7 @@ interface EvolveState {
     reviewMaxAutoPerTurn: number; maxPendingQueue: number
     disposalMode: 'manual' | 'suggest' | 'tidy'
     disposalMinIdleDays: number; tidyMaxPerRun: number; idleMinutes: number
+    skillProposalMode: 'inherit'|'manual'|'balanced'|'autonomous'; skillAutoMaxChars:number; skillMaxChars:number
   }
   models: ModelRow[]
   memoryStats: {
@@ -61,6 +63,7 @@ interface EvolveState {
   }
   rejectedQueue?: RejectedRow[]
   unclaimedSkills?: UnclaimedSkill[]
+  proposals?: SkillProposal[]
   skillStats: {
     counts: { active: number; stale: number; archived: number }
     triage?: { totalTurns: number; successes: number; failures: number; bySkill: Record<string, TriageSkill> } | { disabled: true }
@@ -160,6 +163,12 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
       await refresh()
     } catch (e) { setNote(String(e)) } finally { setSaving(false) }
   }, [refresh])
+
+  const proposalAction = useCallback(async (id:string, action:'apply'|'reject') => {
+    setSaving(true); setNote('')
+    try { const r=await apiPost<{status:string;reason?:string}>(`${API}/proposals/${id}/${action}`, {opId:`${action}_${Date.now().toString(36)}`}); setNote(r.reason?`${r.status}: ${r.reason}`:`✅ 提案 ${r.status}`); await refresh() }
+    catch(e){setNote(String(e))} finally{setSaving(false)}
+  },[refresh])
 
   // ── v0.4.2 controlled prune ──
   const [prune, setPrune] = useState<PruneState | null>(null)
@@ -295,6 +304,22 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
           </div>
         )}
       </div>
+
+      <div style={box}>
+        <b>Skill 写入审批</b>
+        <div style={dim}>默认跟随摄入档：手动/平衡档先生成提案，只有自主档可直写。要恢复旧式直写可显式选“自主”。</div>
+        <select value={cfg?.skillProposalMode ?? 'inherit'} disabled={saving||!cfg} onChange={(e)=>void setConfig({skillProposalMode:e.target.value})} style={{marginTop:8,padding:6}}>
+          <option value="inherit">跟随摄入档（当前：{cfg?.approvalMode ?? 'balanced'}）</option><option value="manual">手动：全部提案</option><option value="balanced">平衡：全部提案</option><option value="autonomous">自主：过安全闸后直写</option>
+        </select>
+        <div style={{marginTop:8,fontSize:12}}>
+          人工正文上限 <input type="number" min={1000} max={500000} value={cfg?.skillMaxChars ?? 40000} disabled={saving} onChange={e=>void setConfig({skillMaxChars:Number(e.target.value)})} style={{width:90}} /> 字；
+          自动路径上限 <input type="number" min={1000} max={200000} value={cfg?.skillAutoMaxChars ?? 10000} disabled={saving} onChange={e=>void setConfig({skillAutoMaxChars:Number(e.target.value)})} style={{width:90}} /> 字。
+        </div>
+      </div>
+      {s?.proposals && s.proposals.length>0 ? <div style={box}>
+        <b>Skill 提案审阅（{s.proposals.length}）</b><div style={dim}>模型只能生成提案，不能自行应用。目标被人改过时会转 stale，不覆盖新内容。</div>
+        <table style={{width:'100%',marginTop:8,...mono}}><tbody>{s.proposals.map(p=><tr key={p.id}><td>{p.action}</td><td>{p.targetSkill}</td><td>{p.state}</td><td style={{textAlign:'right',whiteSpace:'nowrap'}}>{p.state==='pending'?<><button style={btnTiny} disabled={saving} onClick={()=>void proposalAction(p.id,'apply')}>应用</button>{' '}<button style={btnTiny} disabled={saving} onClick={()=>void proposalAction(p.id,'reject')}>拒绝</button></>:null}</td></tr>)}</tbody></table>
+      </div>:null}
 
       {/* ── Block 2: Approval queue ── */}
       <div style={box}>
