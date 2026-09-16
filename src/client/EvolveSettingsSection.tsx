@@ -167,7 +167,7 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
 
   const proposalAction = useCallback(async (id:string, action:'apply'|'reject') => {
     setSaving(true); setNote('')
-    try { const r=await apiPost<{status:string;reason?:string}>(`${API}/proposals/${id}/${action}`, {opId:`${action}_${Date.now().toString(36)}`}); setNote(r.reason?`${r.status}: ${r.reason}`:`✅ 提案 ${r.status}`); await refresh() }
+    try { const cap=await apiPost<{capId:string}>(`${API}/capability/mint`, {purpose:`proposal-${action}`,target:{proposalId:id}}); const r=await apiPost<{status:string;reason?:string}>(`${API}/proposals/${id}/${action}`, {opId:`${action}_${Date.now().toString(36)}`,capId:cap.capId}); setNote(r.reason?`${r.status}: ${r.reason}`:`✅ 提案 ${r.status}`); await refresh() }
     catch(e){setNote(String(e))} finally{setSaving(false)}
   },[refresh])
 
