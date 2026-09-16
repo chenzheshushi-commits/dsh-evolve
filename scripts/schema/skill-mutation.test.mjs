@@ -179,6 +179,16 @@ test('restore and rollback enter the throat too', () => {
   } finally { rmSync(e.root, { recursive: true, force: true }); }
 });
 
+test('protocol-D move refuses EXDEV and never copy+deletes', () => {
+  const src = readFileSync(new URL('../../lib/skills.js', import.meta.url), 'utf8');
+  const block = src.slice(src.indexOf('function moveDir'), src.indexOf('/**', src.indexOf('function moveDir')));
+  assert.match(block, /cross-filesystem skill move refused/);
+  assert.equal(/cpSync|copyFile|rmSync/.test(block), false);
+  const archive = src.slice(src.indexOf('export function archiveSkill'), src.indexOf('export function restoreSkill'));
+  assert.match(archive, /archive target already exists/);
+  assert.equal(/existsSync\(dst\)\) rmSync/.test(archive), false);
+});
+
 test('REAL index.js has zero direct low-level mutation calls', () => {
   const src = readFileSync(new URL('../../lib/index.js', import.meta.url), 'utf8');
   const forbidden = [
