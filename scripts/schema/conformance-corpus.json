@@ -1,0 +1,4252 @@
+{
+  "schemaVersion": 1,
+  "generatedFrom": "scripts/schema/build_conformance_corpus.py",
+  "contract": "Every case must produce an identical verdict in the Python contracts and in the JS runtime port. A mismatch means the two implementations have drifted and the JS side is NOT enforcing the plan.",
+  "layers": {
+    "structure": "ajv against op-manifest.schema.json",
+    "semantic": "JS port of semantic_validator",
+    "pairing": "JS port of validate_resolution_against_target",
+    "cas": "JS port of check_resolution_cas"
+  },
+  "caseCount": 47,
+  "cases": [
+    {
+      "id": "structure/frozen-valid",
+      "layer": "structure",
+      "legality": "must-be-legal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "CONFLICT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            },
+            {
+              "receiptId": "rc-2",
+              "skillName": "my-skill",
+              "callId": "call-2",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "UNRESOLVED"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": true
+      },
+      "why": "a frozen protocol-B apply is a legal manifest"
+    },
+    {
+      "id": "structure/resolution-valid",
+      "layer": "structure",
+      "legality": "must-be-legal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "resolution",
+          "opId": "op-res",
+          "revision": 1,
+          "phase": "INTENT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-res/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-user",
+          "resolvesOpId": "op-frozen",
+          "resolvedKind": "apply",
+          "decision": "rollback",
+          "capClaim": {
+            "capId": "cap-res",
+            "purpose": "operation-resolve",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-res",
+            "state": "claimed"
+          },
+          "releasedCapId": "cap-frozen",
+          "releasedReceiptIds": [
+            "rc-1",
+            "rc-2"
+          ],
+          "observedConflictHash": "8a054460cadc1619b0147a24e9a1f820a9ffe8f31a218d4e32f1a6f9dac6d07d",
+          "targetName": "my-skill"
+        }
+      },
+      "expect": {
+        "valid": true
+      },
+      "why": "a resolution is a legal manifest"
+    },
+    {
+      "id": "structure/frozen-carries-cas",
+      "layer": "structure",
+      "legality": "must-be-legal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "CONFLICT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            },
+            {
+              "receiptId": "rc-2",
+              "skillName": "my-skill",
+              "callId": "call-2",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "RESOLVING",
+            "resolutionOpId": "op-res"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": true
+      },
+      "why": "CAS ownership must be storable -- rev18 could not store it, so CAS was a no-op"
+    },
+    {
+      "id": "structure/unknown-cas-status",
+      "layer": "structure",
+      "legality": "intentionally-illegal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "CONFLICT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            },
+            {
+              "receiptId": "rc-2",
+              "skillName": "my-skill",
+              "callId": "call-2",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "WAT"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": false
+      },
+      "why": "an unknown CAS status must be rejected, not treated as UNRESOLVED"
+    },
+    {
+      "id": "structure/resolution-cannot-freeze",
+      "layer": "structure",
+      "legality": "intentionally-illegal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "resolution",
+          "opId": "op-res",
+          "revision": 1,
+          "phase": "CONFLICT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-res/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "web-user",
+          "resolvesOpId": "op-frozen",
+          "resolvedKind": "apply",
+          "decision": "rollback",
+          "capClaim": {
+            "capId": "cap-res",
+            "purpose": "operation-resolve",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-res",
+            "state": "claimed"
+          },
+          "releasedCapId": "cap-frozen",
+          "releasedReceiptIds": [
+            "rc-1",
+            "rc-2"
+          ],
+          "observedConflictHash": "8a054460cadc1619b0147a24e9a1f820a9ffe8f31a218d4e32f1a6f9dac6d07d",
+          "targetName": "my-skill"
+        }
+      },
+      "expect": {
+        "valid": false
+      },
+      "why": "a frozen resolution would recreate the deadlock it exists to break"
+    },
+    {
+      "id": "structure/unknown-field",
+      "layer": "structure",
+      "legality": "intentionally-illegal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "CONFLICT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            },
+            {
+              "receiptId": "rc-2",
+              "skillName": "my-skill",
+              "callId": "call-2",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "UNRESOLVED"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          },
+          "somethingNew": 1
+        }
+      },
+      "expect": {
+        "valid": false
+      },
+      "why": "every branch is closed (additionalProperties:false)"
+    },
+    {
+      "id": "structure/autonomous-with-capability",
+      "layer": "structure",
+      "legality": "intentionally-illegal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "CONFLICT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "autonomous-tool",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            },
+            {
+              "receiptId": "rc-2",
+              "skillName": "my-skill",
+              "callId": "call-2",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "UNRESOLVED"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": false
+      },
+      "why": "the autonomous path has no Web capability, so this shape must not validate"
+    },
+    {
+      "id": "semantic/frozen-clean",
+      "layer": "semantic",
+      "legality": "must-be-legal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "CONFLICT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            },
+            {
+              "receiptId": "rc-2",
+              "skillName": "my-skill",
+              "callId": "call-2",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "UNRESOLVED"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": true,
+        "errorCount": 0
+      },
+      "why": "the frozen fixture must satisfy single-manifest invariants"
+    },
+    {
+      "id": "semantic/foreign-marker-opid",
+      "layer": "semantic",
+      "legality": "intentionally-illegal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "CONFLICT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            },
+            {
+              "receiptId": "rc-2",
+              "skillName": "my-skill",
+              "callId": "call-2",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "UNRESOLVED"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-someone-else",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": false,
+        "errorCount": 1
+      },
+      "why": "a foreign marker would let recovery adopt another operation's commit"
+    },
+    {
+      "id": "semantic/conflict-consuming-capability",
+      "layer": "semantic",
+      "legality": "intentionally-illegal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "CONFLICT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "consumed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            },
+            {
+              "receiptId": "rc-2",
+              "skillName": "my-skill",
+              "callId": "call-2",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "UNRESOLVED"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": false,
+        "errorCount": 1
+      },
+      "why": "CONFLICT must hold authorization for the operator, never spend it"
+    },
+    {
+      "id": "structure/resolved-roll-forward",
+      "layer": "structure",
+      "legality": "must-be-legal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "RESOLVED_ROLLED_FORWARD",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": {
+            "outcome": "ok",
+            "completedAt": "2026-09-15T12:05:00Z",
+            "receipt": {
+              "opId": "op-frozen",
+              "kind": "apply",
+              "targetName": "my-skill",
+              "archiveId": null,
+              "finalPath": "skills/my-skill/SKILL.md",
+              "afterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          },
+          "error": null,
+          "conflict": null,
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "consumed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "consumed"
+            }
+          ],
+          "resolution": {
+            "status": "RESOLVED",
+            "resolutionOpId": "op-res",
+            "decision": "roll-forward",
+            "resolvedAt": "2026-09-15T12:05:00Z"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": true
+      },
+      "why": "RESOLVED_ROLLED_FORWARD must be a reachable phase"
+    },
+    {
+      "id": "semantic/resolved-roll-forward",
+      "layer": "semantic",
+      "legality": "must-be-legal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "RESOLVED_ROLLED_FORWARD",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": {
+            "outcome": "ok",
+            "completedAt": "2026-09-15T12:05:00Z",
+            "receipt": {
+              "opId": "op-frozen",
+              "kind": "apply",
+              "targetName": "my-skill",
+              "archiveId": null,
+              "finalPath": "skills/my-skill/SKILL.md",
+              "afterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          },
+          "error": null,
+          "conflict": null,
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "consumed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "consumed"
+            }
+          ],
+          "resolution": {
+            "status": "RESOLVED",
+            "resolutionOpId": "op-res",
+            "decision": "roll-forward",
+            "resolvedAt": "2026-09-15T12:05:00Z"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": true,
+        "errorCount": 0
+      },
+      "why": "roll-forward must leave authorization consumed"
+    },
+    {
+      "id": "semantic/resolved-roll-forward-wrong-cap",
+      "layer": "semantic",
+      "legality": "intentionally-illegal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "RESOLVED_ROLLED_FORWARD",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": {
+            "outcome": "ok",
+            "completedAt": "2026-09-15T12:05:00Z",
+            "receipt": {
+              "opId": "op-frozen",
+              "kind": "apply",
+              "targetName": "my-skill",
+              "archiveId": null,
+              "finalPath": "skills/my-skill/SKILL.md",
+              "afterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          },
+          "error": null,
+          "conflict": null,
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "consumed"
+            }
+          ],
+          "resolution": {
+            "status": "RESOLVED",
+            "resolutionOpId": "op-res",
+            "decision": "roll-forward",
+            "resolvedAt": "2026-09-15T12:05:00Z"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": false,
+        "errorCount": 1
+      },
+      "why": "RESOLVED_ROLLED_FORWARD with capability=claimed must be rejected"
+    },
+    {
+      "id": "semantic/resolved-roll-forward-wrong-receipt",
+      "layer": "semantic",
+      "legality": "intentionally-illegal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "RESOLVED_ROLLED_FORWARD",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": {
+            "outcome": "ok",
+            "completedAt": "2026-09-15T12:05:00Z",
+            "receipt": {
+              "opId": "op-frozen",
+              "kind": "apply",
+              "targetName": "my-skill",
+              "archiveId": null,
+              "finalPath": "skills/my-skill/SKILL.md",
+              "afterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          },
+          "error": null,
+          "conflict": null,
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "consumed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "RESOLVED",
+            "resolutionOpId": "op-res",
+            "decision": "roll-forward",
+            "resolvedAt": "2026-09-15T12:05:00Z"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": false,
+        "errorCount": 1
+      },
+      "why": "RESOLVED_ROLLED_FORWARD with receipt=claimed must be rejected -- receipt left claimed is a leak"
+    },
+    {
+      "id": "semantic/resolved-roll-forward-decision-mismatch",
+      "layer": "semantic",
+      "legality": "intentionally-illegal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "RESOLVED_ROLLED_FORWARD",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": {
+            "outcome": "ok",
+            "completedAt": "2026-09-15T12:05:00Z",
+            "receipt": {
+              "opId": "op-frozen",
+              "kind": "apply",
+              "targetName": "my-skill",
+              "archiveId": null,
+              "finalPath": "skills/my-skill/SKILL.md",
+              "afterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          },
+          "error": null,
+          "conflict": null,
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "consumed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "consumed"
+            }
+          ],
+          "resolution": {
+            "status": "RESOLVED",
+            "resolutionOpId": "op-res",
+            "decision": "abandon",
+            "resolvedAt": "2026-09-15T12:05:00Z"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": false,
+        "errorCount": 2
+      },
+      "why": "phase and recorded decision must agree"
+    },
+    {
+      "id": "structure/resolved-rollback",
+      "layer": "structure",
+      "legality": "must-be-legal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "RESOLVED_ROLLED_BACK",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "available"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "available"
+            }
+          ],
+          "resolution": {
+            "status": "RESOLVED",
+            "resolutionOpId": "op-res",
+            "decision": "rollback",
+            "resolvedAt": "2026-09-15T12:05:00Z"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": true
+      },
+      "why": "RESOLVED_ROLLED_BACK must be a reachable phase"
+    },
+    {
+      "id": "semantic/resolved-rollback",
+      "layer": "semantic",
+      "legality": "must-be-legal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "RESOLVED_ROLLED_BACK",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "available"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "available"
+            }
+          ],
+          "resolution": {
+            "status": "RESOLVED",
+            "resolutionOpId": "op-res",
+            "decision": "rollback",
+            "resolvedAt": "2026-09-15T12:05:00Z"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": true,
+        "errorCount": 0
+      },
+      "why": "rollback must leave authorization available"
+    },
+    {
+      "id": "semantic/resolved-rollback-wrong-cap",
+      "layer": "semantic",
+      "legality": "intentionally-illegal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "RESOLVED_ROLLED_BACK",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "available"
+            }
+          ],
+          "resolution": {
+            "status": "RESOLVED",
+            "resolutionOpId": "op-res",
+            "decision": "rollback",
+            "resolvedAt": "2026-09-15T12:05:00Z"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": false,
+        "errorCount": 1
+      },
+      "why": "RESOLVED_ROLLED_BACK with capability=claimed must be rejected"
+    },
+    {
+      "id": "semantic/resolved-rollback-wrong-receipt",
+      "layer": "semantic",
+      "legality": "intentionally-illegal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "RESOLVED_ROLLED_BACK",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "available"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "RESOLVED",
+            "resolutionOpId": "op-res",
+            "decision": "rollback",
+            "resolvedAt": "2026-09-15T12:05:00Z"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": false,
+        "errorCount": 1
+      },
+      "why": "RESOLVED_ROLLED_BACK with receipt=claimed must be rejected -- receipt left claimed is a leak"
+    },
+    {
+      "id": "semantic/resolved-rollback-decision-mismatch",
+      "layer": "semantic",
+      "legality": "intentionally-illegal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "RESOLVED_ROLLED_BACK",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "available"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "available"
+            }
+          ],
+          "resolution": {
+            "status": "RESOLVED",
+            "resolutionOpId": "op-res",
+            "decision": "abandon",
+            "resolvedAt": "2026-09-15T12:05:00Z"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": false,
+        "errorCount": 2
+      },
+      "why": "phase and recorded decision must agree"
+    },
+    {
+      "id": "structure/resolved-abandon",
+      "layer": "structure",
+      "legality": "must-be-legal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "RESOLVED_ABANDONED",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "available"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "available"
+            }
+          ],
+          "resolution": {
+            "status": "RESOLVED",
+            "resolutionOpId": "op-res",
+            "decision": "abandon",
+            "resolvedAt": "2026-09-15T12:05:00Z"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": true
+      },
+      "why": "RESOLVED_ABANDONED must be a reachable phase"
+    },
+    {
+      "id": "semantic/resolved-abandon",
+      "layer": "semantic",
+      "legality": "must-be-legal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "RESOLVED_ABANDONED",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "available"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "available"
+            }
+          ],
+          "resolution": {
+            "status": "RESOLVED",
+            "resolutionOpId": "op-res",
+            "decision": "abandon",
+            "resolvedAt": "2026-09-15T12:05:00Z"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": true,
+        "errorCount": 0
+      },
+      "why": "abandon must leave authorization available"
+    },
+    {
+      "id": "semantic/resolved-abandon-wrong-cap",
+      "layer": "semantic",
+      "legality": "intentionally-illegal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "RESOLVED_ABANDONED",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "available"
+            }
+          ],
+          "resolution": {
+            "status": "RESOLVED",
+            "resolutionOpId": "op-res",
+            "decision": "abandon",
+            "resolvedAt": "2026-09-15T12:05:00Z"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": false,
+        "errorCount": 1
+      },
+      "why": "RESOLVED_ABANDONED with capability=claimed must be rejected"
+    },
+    {
+      "id": "semantic/resolved-abandon-wrong-receipt",
+      "layer": "semantic",
+      "legality": "intentionally-illegal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "RESOLVED_ABANDONED",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "available"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "RESOLVED",
+            "resolutionOpId": "op-res",
+            "decision": "abandon",
+            "resolvedAt": "2026-09-15T12:05:00Z"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": false,
+        "errorCount": 1
+      },
+      "why": "RESOLVED_ABANDONED with receipt=claimed must be rejected -- receipt left claimed is a leak"
+    },
+    {
+      "id": "semantic/resolved-abandon-decision-mismatch",
+      "layer": "semantic",
+      "legality": "intentionally-illegal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "RESOLVED_ABANDONED",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "available"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "available"
+            }
+          ],
+          "resolution": {
+            "status": "RESOLVED",
+            "resolutionOpId": "op-res",
+            "decision": "rollback",
+            "resolvedAt": "2026-09-15T12:05:00Z"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": false,
+        "errorCount": 2
+      },
+      "why": "phase and recorded decision must agree"
+    },
+    {
+      "id": "pairing/correct",
+      "layer": "pairing",
+      "legality": "must-be-legal",
+      "input": {
+        "resolution": {
+          "schemaVersion": 1,
+          "kind": "resolution",
+          "opId": "op-res",
+          "revision": 1,
+          "phase": "INTENT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-res/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-user",
+          "resolvesOpId": "op-frozen",
+          "resolvedKind": "apply",
+          "decision": "rollback",
+          "capClaim": {
+            "capId": "cap-res",
+            "purpose": "operation-resolve",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-res",
+            "state": "claimed"
+          },
+          "releasedCapId": "cap-frozen",
+          "releasedReceiptIds": [
+            "rc-1",
+            "rc-2"
+          ],
+          "observedConflictHash": "8a054460cadc1619b0147a24e9a1f820a9ffe8f31a218d4e32f1a6f9dac6d07d",
+          "targetName": "my-skill"
+        },
+        "original": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "CONFLICT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            },
+            {
+              "receiptId": "rc-2",
+              "skillName": "my-skill",
+              "callId": "call-2",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "UNRESOLVED"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": true,
+        "errorCount": 0
+      },
+      "why": "a correct pair must be accepted"
+    },
+    {
+      "id": "pairing/released-cap-invented",
+      "layer": "pairing",
+      "legality": "intentionally-illegal",
+      "input": {
+        "resolution": {
+          "schemaVersion": 1,
+          "kind": "resolution",
+          "opId": "op-res",
+          "revision": 1,
+          "phase": "INTENT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-res/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-user",
+          "resolvesOpId": "op-frozen",
+          "resolvedKind": "apply",
+          "decision": "rollback",
+          "capClaim": {
+            "capId": "cap-res",
+            "purpose": "operation-resolve",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-res",
+            "state": "claimed"
+          },
+          "releasedCapId": "cap-invented",
+          "releasedReceiptIds": [
+            "rc-1",
+            "rc-2"
+          ],
+          "observedConflictHash": "8a054460cadc1619b0147a24e9a1f820a9ffe8f31a218d4e32f1a6f9dac6d07d",
+          "targetName": "my-skill"
+        },
+        "original": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "CONFLICT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            },
+            {
+              "receiptId": "rc-2",
+              "skillName": "my-skill",
+              "callId": "call-2",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "UNRESOLVED"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": false,
+        "errorCount": 1
+      },
+      "why": "the released capability must be the one the original actually holds"
+    },
+    {
+      "id": "pairing/released-receipts-empty",
+      "layer": "pairing",
+      "legality": "intentionally-illegal",
+      "input": {
+        "resolution": {
+          "schemaVersion": 1,
+          "kind": "resolution",
+          "opId": "op-res",
+          "revision": 1,
+          "phase": "INTENT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-res/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-user",
+          "resolvesOpId": "op-frozen",
+          "resolvedKind": "apply",
+          "decision": "rollback",
+          "capClaim": {
+            "capId": "cap-res",
+            "purpose": "operation-resolve",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-res",
+            "state": "claimed"
+          },
+          "releasedCapId": "cap-frozen",
+          "releasedReceiptIds": [],
+          "observedConflictHash": "8a054460cadc1619b0147a24e9a1f820a9ffe8f31a218d4e32f1a6f9dac6d07d",
+          "targetName": "my-skill"
+        },
+        "original": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "CONFLICT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            },
+            {
+              "receiptId": "rc-2",
+              "skillName": "my-skill",
+              "callId": "call-2",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "UNRESOLVED"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": false,
+        "errorCount": 1
+      },
+      "why": "releasing nothing leaks every frozen receipt"
+    },
+    {
+      "id": "pairing/released-receipts-subset",
+      "layer": "pairing",
+      "legality": "intentionally-illegal",
+      "input": {
+        "resolution": {
+          "schemaVersion": 1,
+          "kind": "resolution",
+          "opId": "op-res",
+          "revision": 1,
+          "phase": "INTENT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-res/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-user",
+          "resolvesOpId": "op-frozen",
+          "resolvedKind": "apply",
+          "decision": "rollback",
+          "capClaim": {
+            "capId": "cap-res",
+            "purpose": "operation-resolve",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-res",
+            "state": "claimed"
+          },
+          "releasedCapId": "cap-frozen",
+          "releasedReceiptIds": [
+            "rc-1"
+          ],
+          "observedConflictHash": "8a054460cadc1619b0147a24e9a1f820a9ffe8f31a218d4e32f1a6f9dac6d07d",
+          "targetName": "my-skill"
+        },
+        "original": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "CONFLICT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            },
+            {
+              "receiptId": "rc-2",
+              "skillName": "my-skill",
+              "callId": "call-2",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "UNRESOLVED"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": false,
+        "errorCount": 1
+      },
+      "why": "releasing a subset leaks the rest forever"
+    },
+    {
+      "id": "pairing/released-receipts-ghost",
+      "layer": "pairing",
+      "legality": "intentionally-illegal",
+      "input": {
+        "resolution": {
+          "schemaVersion": 1,
+          "kind": "resolution",
+          "opId": "op-res",
+          "revision": 1,
+          "phase": "INTENT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-res/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-user",
+          "resolvesOpId": "op-frozen",
+          "resolvedKind": "apply",
+          "decision": "rollback",
+          "capClaim": {
+            "capId": "cap-res",
+            "purpose": "operation-resolve",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-res",
+            "state": "claimed"
+          },
+          "releasedCapId": "cap-frozen",
+          "releasedReceiptIds": [
+            "rc-1",
+            "rc-2",
+            "rc-ghost"
+          ],
+          "observedConflictHash": "8a054460cadc1619b0147a24e9a1f820a9ffe8f31a218d4e32f1a6f9dac6d07d",
+          "targetName": "my-skill"
+        },
+        "original": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "CONFLICT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            },
+            {
+              "receiptId": "rc-2",
+              "skillName": "my-skill",
+              "callId": "call-2",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "UNRESOLVED"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": false,
+        "errorCount": 1
+      },
+      "why": "naming a receipt the original never held is fabrication"
+    },
+    {
+      "id": "pairing/kind-mismatch",
+      "layer": "pairing",
+      "legality": "intentionally-illegal",
+      "input": {
+        "resolution": {
+          "schemaVersion": 1,
+          "kind": "resolution",
+          "opId": "op-res",
+          "revision": 1,
+          "phase": "INTENT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-res/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-user",
+          "resolvesOpId": "op-frozen",
+          "resolvedKind": "move",
+          "decision": "rollback",
+          "capClaim": {
+            "capId": "cap-res",
+            "purpose": "operation-resolve",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-res",
+            "state": "claimed"
+          },
+          "releasedCapId": "cap-frozen",
+          "releasedReceiptIds": [
+            "rc-1",
+            "rc-2"
+          ],
+          "observedConflictHash": "8a054460cadc1619b0147a24e9a1f820a9ffe8f31a218d4e32f1a6f9dac6d07d",
+          "targetName": "my-skill"
+        },
+        "original": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "CONFLICT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            },
+            {
+              "receiptId": "rc-2",
+              "skillName": "my-skill",
+              "callId": "call-2",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "UNRESOLVED"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": false,
+        "errorCount": 1
+      },
+      "why": "resolvedKind must match the frozen operation"
+    },
+    {
+      "id": "pairing/kind-unknown",
+      "layer": "pairing",
+      "legality": "intentionally-illegal",
+      "input": {
+        "resolution": {
+          "schemaVersion": 1,
+          "kind": "resolution",
+          "opId": "op-res",
+          "revision": 1,
+          "phase": "INTENT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-res/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-user",
+          "resolvesOpId": "op-frozen",
+          "resolvedKind": "nonexistent-kind",
+          "decision": "rollback",
+          "capClaim": {
+            "capId": "cap-res",
+            "purpose": "operation-resolve",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-res",
+            "state": "claimed"
+          },
+          "releasedCapId": "cap-frozen",
+          "releasedReceiptIds": [
+            "rc-1",
+            "rc-2"
+          ],
+          "observedConflictHash": "8a054460cadc1619b0147a24e9a1f820a9ffe8f31a218d4e32f1a6f9dac6d07d",
+          "targetName": "my-skill"
+        },
+        "original": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "CONFLICT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            },
+            {
+              "receiptId": "rc-2",
+              "skillName": "my-skill",
+              "callId": "call-2",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "UNRESOLVED"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": false,
+        "errorCount": 1
+      },
+      "why": "resolvedKind must be a real kind"
+    },
+    {
+      "id": "pairing/target-mismatch",
+      "layer": "pairing",
+      "legality": "intentionally-illegal",
+      "input": {
+        "resolution": {
+          "schemaVersion": 1,
+          "kind": "resolution",
+          "opId": "op-res",
+          "revision": 1,
+          "phase": "INTENT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-res/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-user",
+          "resolvesOpId": "op-frozen",
+          "resolvedKind": "apply",
+          "decision": "rollback",
+          "capClaim": {
+            "capId": "cap-res",
+            "purpose": "operation-resolve",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-res",
+            "state": "claimed"
+          },
+          "releasedCapId": "cap-frozen",
+          "releasedReceiptIds": [
+            "rc-1",
+            "rc-2"
+          ],
+          "observedConflictHash": "8a054460cadc1619b0147a24e9a1f820a9ffe8f31a218d4e32f1a6f9dac6d07d",
+          "targetName": "some-other-skill"
+        },
+        "original": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "CONFLICT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            },
+            {
+              "receiptId": "rc-2",
+              "skillName": "my-skill",
+              "callId": "call-2",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "UNRESOLVED"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": false,
+        "errorCount": 1
+      },
+      "why": "resolving op A while reporting work on skill B must be impossible"
+    },
+    {
+      "id": "pairing/observed-hash-invented",
+      "layer": "pairing",
+      "legality": "intentionally-illegal",
+      "input": {
+        "resolution": {
+          "schemaVersion": 1,
+          "kind": "resolution",
+          "opId": "op-res",
+          "revision": 1,
+          "phase": "INTENT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-res/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-user",
+          "resolvesOpId": "op-frozen",
+          "resolvedKind": "apply",
+          "decision": "rollback",
+          "capClaim": {
+            "capId": "cap-res",
+            "purpose": "operation-resolve",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-res",
+            "state": "claimed"
+          },
+          "releasedCapId": "cap-frozen",
+          "releasedReceiptIds": [
+            "rc-1",
+            "rc-2"
+          ],
+          "observedConflictHash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "targetName": "my-skill"
+        },
+        "original": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "CONFLICT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            },
+            {
+              "receiptId": "rc-2",
+              "skillName": "my-skill",
+              "callId": "call-2",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "UNRESOLVED"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": false,
+        "errorCount": 1
+      },
+      "why": "the operator must have seen the current diagnostics"
+    },
+    {
+      "id": "pairing/self-resolving",
+      "layer": "pairing",
+      "legality": "intentionally-illegal",
+      "input": {
+        "resolution": {
+          "schemaVersion": 1,
+          "kind": "resolution",
+          "opId": "op-res",
+          "revision": 1,
+          "phase": "INTENT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-res/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-user",
+          "resolvesOpId": "op-res",
+          "resolvedKind": "apply",
+          "decision": "rollback",
+          "capClaim": {
+            "capId": "cap-res",
+            "purpose": "operation-resolve",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-res",
+            "state": "claimed"
+          },
+          "releasedCapId": "cap-frozen",
+          "releasedReceiptIds": [
+            "rc-1",
+            "rc-2"
+          ],
+          "observedConflictHash": "8a054460cadc1619b0147a24e9a1f820a9ffe8f31a218d4e32f1a6f9dac6d07d",
+          "targetName": "my-skill"
+        },
+        "original": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "CONFLICT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            },
+            {
+              "receiptId": "rc-2",
+              "skillName": "my-skill",
+              "callId": "call-2",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "UNRESOLVED"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": false,
+        "errorCount": 1
+      },
+      "why": "a resolution may not resolve itself"
+    },
+    {
+      "id": "pairing/target-not-frozen",
+      "layer": "pairing",
+      "legality": "intentionally-illegal",
+      "input": {
+        "resolution": {
+          "schemaVersion": 1,
+          "kind": "resolution",
+          "opId": "op-res",
+          "revision": 1,
+          "phase": "INTENT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-res/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-user",
+          "resolvesOpId": "op-frozen",
+          "resolvedKind": "apply",
+          "decision": "rollback",
+          "capClaim": {
+            "capId": "cap-res",
+            "purpose": "operation-resolve",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-res",
+            "state": "claimed"
+          },
+          "releasedCapId": "cap-frozen",
+          "releasedReceiptIds": [
+            "rc-1",
+            "rc-2"
+          ],
+          "observedConflictHash": "8a054460cadc1619b0147a24e9a1f820a9ffe8f31a218d4e32f1a6f9dac6d07d",
+          "targetName": "my-skill"
+        },
+        "original": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "COMMITTED",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            },
+            {
+              "receiptId": "rc-2",
+              "skillName": "my-skill",
+              "callId": "call-2",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "UNRESOLVED"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": false,
+        "errorCount": 2
+      },
+      "why": "only CONFLICT/PARTIAL hold frozen authorization"
+    },
+    {
+      "id": "pairing/diagnostics-changed",
+      "layer": "pairing",
+      "legality": "intentionally-illegal",
+      "input": {
+        "resolution": {
+          "schemaVersion": 1,
+          "kind": "resolution",
+          "opId": "op-res",
+          "revision": 1,
+          "phase": "INTENT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-res/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-user",
+          "resolvesOpId": "op-frozen",
+          "resolvedKind": "apply",
+          "decision": "rollback",
+          "capClaim": {
+            "capId": "cap-res",
+            "purpose": "operation-resolve",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-res",
+            "state": "claimed"
+          },
+          "releasedCapId": "cap-frozen",
+          "releasedReceiptIds": [
+            "rc-1",
+            "rc-2"
+          ],
+          "observedConflictHash": "8a054460cadc1619b0147a24e9a1f820a9ffe8f31a218d4e32f1a6f9dac6d07d",
+          "targetName": "my-skill"
+        },
+        "original": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "CONFLICT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "something else entirely",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            },
+            {
+              "receiptId": "rc-2",
+              "skillName": "my-skill",
+              "callId": "call-2",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "UNRESOLVED"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": false,
+        "errorCount": 1
+      },
+      "why": "the situation must not have moved since review"
+    },
+    {
+      "id": "pairing/nocap-null-released",
+      "layer": "pairing",
+      "legality": "must-be-legal",
+      "input": {
+        "resolution": {
+          "schemaVersion": 1,
+          "kind": "resolution",
+          "opId": "op-res2",
+          "revision": 1,
+          "phase": "INTENT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-res/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-user",
+          "resolvesOpId": "op-nocap",
+          "resolvedKind": "direct",
+          "decision": "rollback",
+          "capClaim": {
+            "capId": "cap-res",
+            "purpose": "operation-resolve",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-res2",
+            "state": "claimed"
+          },
+          "releasedCapId": null,
+          "releasedReceiptIds": [
+            "rc-n"
+          ],
+          "observedConflictHash": "8a054460cadc1619b0147a24e9a1f820a9ffe8f31a218d4e32f1a6f9dac6d07d",
+          "targetName": "my-skill"
+        },
+        "original": {
+          "schemaVersion": 1,
+          "kind": "direct",
+          "opId": "op-nocap",
+          "revision": 2,
+          "phase": "PARTIAL",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-nocap/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "autonomous-tool",
+          "protocol": "B",
+          "action": "refine",
+          "targetName": "my-skill",
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-nocap/backup/my-skill.tar",
+          "lastCommittedOpId": "op-nocap",
+          "marker": {
+            "opId": "op-nocap",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-nocap"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-n",
+              "skillName": "my-skill",
+              "callId": "call-n",
+              "state": "claimed"
+            }
+          ],
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "configRevision": 4,
+          "resolution": {
+            "status": "UNRESOLVED"
+          }
+        }
+      },
+      "expect": {
+        "valid": true,
+        "errorCount": 0
+      },
+      "why": "a capability-less frozen op is resolved with releasedCapId=null"
+    },
+    {
+      "id": "pairing/nocap-invented-released",
+      "layer": "pairing",
+      "legality": "intentionally-illegal",
+      "input": {
+        "resolution": {
+          "schemaVersion": 1,
+          "kind": "resolution",
+          "opId": "op-res2",
+          "revision": 1,
+          "phase": "INTENT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-res/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-user",
+          "resolvesOpId": "op-nocap",
+          "resolvedKind": "direct",
+          "decision": "rollback",
+          "capClaim": {
+            "capId": "cap-res",
+            "purpose": "operation-resolve",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-res2",
+            "state": "claimed"
+          },
+          "releasedCapId": "cap-invented",
+          "releasedReceiptIds": [
+            "rc-n"
+          ],
+          "observedConflictHash": "8a054460cadc1619b0147a24e9a1f820a9ffe8f31a218d4e32f1a6f9dac6d07d",
+          "targetName": "my-skill"
+        },
+        "original": {
+          "schemaVersion": 1,
+          "kind": "direct",
+          "opId": "op-nocap",
+          "revision": 2,
+          "phase": "PARTIAL",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-nocap/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "autonomous-tool",
+          "protocol": "B",
+          "action": "refine",
+          "targetName": "my-skill",
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-nocap/backup/my-skill.tar",
+          "lastCommittedOpId": "op-nocap",
+          "marker": {
+            "opId": "op-nocap",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-nocap"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-n",
+              "skillName": "my-skill",
+              "callId": "call-n",
+              "state": "claimed"
+            }
+          ],
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "configRevision": 4,
+          "resolution": {
+            "status": "UNRESOLVED"
+          }
+        }
+      },
+      "expect": {
+        "valid": false,
+        "errorCount": 1
+      },
+      "why": "but it may not name a capability that never existed"
+    },
+    {
+      "id": "semantic/resolved-no-decision-still-frozen",
+      "layer": "semantic",
+      "legality": "intentionally-illegal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "CONFLICT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            },
+            {
+              "receiptId": "rc-2",
+              "skillName": "my-skill",
+              "callId": "call-2",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "RESOLVED",
+            "resolutionOpId": "op-res",
+            "resolvedAt": "2026-09-15T12:05:00Z"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": false,
+        "errorCount": 1
+      },
+      "why": "status=RESOLVED with no decision and phase=CONFLICT permanently freezes the operation: the CAS refuses every new resolution while authorization stays claimed"
+    },
+    {
+      "id": "semantic/resolved-no-decision-partial",
+      "layer": "semantic",
+      "legality": "intentionally-illegal",
+      "input": {
+        "manifest": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "PARTIAL",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            },
+            {
+              "receiptId": "rc-2",
+              "skillName": "my-skill",
+              "callId": "call-2",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "RESOLVED",
+            "resolutionOpId": "op-res",
+            "resolvedAt": "2026-09-15T12:05:00Z"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        }
+      },
+      "expect": {
+        "valid": false,
+        "errorCount": 1
+      },
+      "why": "same permanent freeze via PARTIAL"
+    },
+    {
+      "id": "cas/unresolved-claim",
+      "layer": "cas",
+      "legality": "must-be-legal",
+      "input": {
+        "original": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "CONFLICT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            },
+            {
+              "receiptId": "rc-2",
+              "skillName": "my-skill",
+              "callId": "call-2",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "UNRESOLVED"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        },
+        "resolutionOpId": "op-res"
+      },
+      "expect": {
+        "ok": true,
+        "code": "claim"
+      },
+      "why": "UNRESOLVED lets a resolution claim it"
+    },
+    {
+      "id": "cas/resolving-same-owner",
+      "layer": "cas",
+      "legality": "must-be-legal",
+      "input": {
+        "original": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "CONFLICT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            },
+            {
+              "receiptId": "rc-2",
+              "skillName": "my-skill",
+              "callId": "call-2",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "RESOLVING",
+            "resolutionOpId": "op-res"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        },
+        "resolutionOpId": "op-res"
+      },
+      "expect": {
+        "ok": true,
+        "code": "retry"
+      },
+      "why": "the same resolution replaying gets its receipt back"
+    },
+    {
+      "id": "cas/resolving-other-owner",
+      "layer": "cas",
+      "legality": "must-be-legal",
+      "input": {
+        "original": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "CONFLICT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            },
+            {
+              "receiptId": "rc-2",
+              "skillName": "my-skill",
+              "callId": "call-2",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "RESOLVING",
+            "resolutionOpId": "op-res"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        },
+        "resolutionOpId": "op-other"
+      },
+      "expect": {
+        "ok": false,
+        "code": "conflict"
+      },
+      "why": "a second resolution must be refused (409) -- this is the double-unfreeze guard"
+    },
+    {
+      "id": "cas/resolved-other-owner",
+      "layer": "cas",
+      "legality": "must-be-legal",
+      "input": {
+        "original": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "RESOLVED_ROLLED_BACK",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "available"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "available"
+            }
+          ],
+          "resolution": {
+            "status": "RESOLVED",
+            "resolutionOpId": "op-res",
+            "decision": "rollback",
+            "resolvedAt": "2026-09-15T12:05:00Z"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        },
+        "resolutionOpId": "op-other"
+      },
+      "expect": {
+        "ok": false,
+        "code": "conflict"
+      },
+      "why": "already resolved by someone else -> 409"
+    },
+    {
+      "id": "cas/resolved-same-owner",
+      "layer": "cas",
+      "legality": "must-be-legal",
+      "input": {
+        "original": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "RESOLVED_ROLLED_BACK",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": null,
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "available"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "available"
+            }
+          ],
+          "resolution": {
+            "status": "RESOLVED",
+            "resolutionOpId": "op-res",
+            "decision": "rollback",
+            "resolvedAt": "2026-09-15T12:05:00Z"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        },
+        "resolutionOpId": "op-res"
+      },
+      "expect": {
+        "ok": true,
+        "code": "retry"
+      },
+      "why": "the owner replaying after RESOLVED gets its receipt"
+    },
+    {
+      "id": "cas/unknown-status",
+      "layer": "cas",
+      "legality": "intentionally-illegal",
+      "input": {
+        "original": {
+          "schemaVersion": 1,
+          "kind": "apply",
+          "opId": "op-frozen",
+          "revision": 5,
+          "phase": "CONFLICT",
+          "createdAt": "2026-09-15T12:00:00Z",
+          "updatedAt": "2026-09-15T12:05:00Z",
+          "eventsPath": ".ops/op-frozen/events.jsonl",
+          "result": null,
+          "error": null,
+          "conflict": {
+            "code": "ETHIRDPARTY",
+            "message": "sidecar moved",
+            "resources": [
+              "my-skill"
+            ],
+            "at": "2026-09-15T12:05:00Z"
+          },
+          "source": "web-proposal",
+          "protocol": "B",
+          "proposalId": "p-1",
+          "targetName": "my-skill",
+          "capClaim": {
+            "capId": "cap-frozen",
+            "purpose": "proposal-apply",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "claimedByOpId": "op-frozen",
+            "state": "claimed"
+          },
+          "receiptClaims": [
+            {
+              "receiptId": "rc-1",
+              "skillName": "my-skill",
+              "callId": "call-1",
+              "state": "claimed"
+            },
+            {
+              "receiptId": "rc-2",
+              "skillName": "my-skill",
+              "callId": "call-2",
+              "state": "claimed"
+            }
+          ],
+          "resolution": {
+            "status": "WAT"
+          },
+          "reservationRevisionBefore": 8,
+          "reservationRevisionAfter": 9,
+          "reservationOwner": {
+            "proposalId": "p-1",
+            "opId": "op-frozen"
+          },
+          "stampProgress": {
+            "done": [],
+            "pending": []
+          },
+          "beforeContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "beforeStateHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tmpPath": "skills/my-skill/SKILL.md.tmp",
+          "finalPath": "skills/my-skill/SKILL.md",
+          "backupPath": ".ops/op-frozen/backup/my-skill.tar",
+          "lastCommittedOpId": "op-frozen",
+          "marker": {
+            "opId": "op-frozen",
+            "protocol": "B",
+            "action": "refine",
+            "expectedAfterContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "expectedAfterStateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "lastCommittedOpId": "op-frozen"
+          }
+        },
+        "resolutionOpId": "op-res"
+      },
+      "expect": {
+        "ok": false,
+        "code": "invalid"
+      },
+      "why": "an unknown status must fail closed, not default to UNRESOLVED"
+    }
+  ]
+}

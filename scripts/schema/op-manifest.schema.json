@@ -1,0 +1,5167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.dsh-evolve/schema/op-manifest-rev14.json",
+  "title": "dsh-evolve v0.6.0 operation manifest (rev14)",
+  "description": "Structural construction contract. Cross-field invariants (opId equality, revision monotonicity, receipt cardinality) are enforced by semantic_validator.py, which is a CO-EQUAL construction contract.",
+  "oneOf": [
+    {
+      "title": "Create proposal from model tool (evidence-backed)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "opId",
+        "revision",
+        "phase",
+        "createdAt",
+        "updatedAt",
+        "eventsPath",
+        "result",
+        "error",
+        "conflict",
+        "source",
+        "action",
+        "targetName",
+        "proposalId",
+        "proposalHash",
+        "sourceIds",
+        "reservationKey",
+        "reservationRevisionBefore",
+        "reservationRevisionAfter",
+        "reservationOwner"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "create-proposal"
+        },
+        "opId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "phase": {
+          "enum": [
+            "ABORTED",
+            "COMPLETE",
+            "CONFLICT",
+            "FAILED",
+            "PARTIAL",
+            "PREPARED",
+            "RESERVED",
+            "RESOLVED_ABANDONED",
+            "RESOLVED_ROLLED_BACK",
+            "RESOLVED_ROLLED_FORWARD"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "eventsPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "conflict": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/conflictDiagnostics"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "const": "model-tool"
+        },
+        "resolution": {
+          "$ref": "#/$defs/resolutionState"
+        },
+        "action": {
+          "enum": [
+            "create",
+            "refine",
+            "fold",
+            "converge"
+          ]
+        },
+        "targetName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "proposalId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "proposalHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "sourceIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "reservationKey": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "reservationRevisionBefore": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reservationRevisionAfter": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "reservationOwner": {
+          "$ref": "#/$defs/reservationOwner"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "COMPLETE"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "$ref": "#/$defs/durableResult"
+              },
+              "error": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "result"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "FAILED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "error": {
+                "$ref": "#/$defs/durableError"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "error"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "CONFLICT"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "PARTIAL"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "ABORTED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "not": {
+                  "enum": [
+                    "COMPLETE",
+                    "ABORTED",
+                    "FAILED",
+                    "CONFLICT",
+                    "PARTIAL",
+                    "RESOLVED_ROLLED_FORWARD",
+                    "RESOLVED_ROLLED_BACK",
+                    "RESOLVED_ABANDONED"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "enum": [
+                  "RESOLVED_ROLLED_FORWARD",
+                  "RESOLVED_ROLLED_BACK",
+                  "RESOLVED_ABANDONED"
+                ]
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "required": [
+              "resolution"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "title": "Create rollback proposal from Web (artifact-backed, capability-gated)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "opId",
+        "revision",
+        "phase",
+        "createdAt",
+        "updatedAt",
+        "eventsPath",
+        "result",
+        "error",
+        "conflict",
+        "source",
+        "action",
+        "targetName",
+        "proposalId",
+        "proposalHash",
+        "artifactId",
+        "artifactSha256",
+        "artifactPath",
+        "memberManifest",
+        "capClaim"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "create-proposal"
+        },
+        "opId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "phase": {
+          "enum": [
+            "ABORTED",
+            "COMPLETE",
+            "CONFLICT",
+            "FAILED",
+            "PARTIAL",
+            "PREPARED",
+            "RESERVED",
+            "RESOLVED_ABANDONED",
+            "RESOLVED_ROLLED_BACK",
+            "RESOLVED_ROLLED_FORWARD"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "eventsPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "conflict": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/conflictDiagnostics"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "const": "web-user"
+        },
+        "resolution": {
+          "$ref": "#/$defs/resolutionState"
+        },
+        "action": {
+          "const": "rollback"
+        },
+        "targetName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "proposalId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "proposalHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "artifactId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "artifactSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "artifactPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "memberManifest": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/member"
+          },
+          "minItems": 1
+        },
+        "capClaim": {
+          "$ref": "#/$defs/capClaim"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "COMPLETE"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "$ref": "#/$defs/durableResult"
+              },
+              "error": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "result"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "FAILED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "error": {
+                "$ref": "#/$defs/durableError"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "error"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "CONFLICT"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "PARTIAL"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "ABORTED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "not": {
+                  "enum": [
+                    "COMPLETE",
+                    "ABORTED",
+                    "FAILED",
+                    "CONFLICT",
+                    "PARTIAL",
+                    "RESOLVED_ROLLED_FORWARD",
+                    "RESOLVED_ROLLED_BACK",
+                    "RESOLVED_ABANDONED"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "enum": [
+                  "RESOLVED_ROLLED_FORWARD",
+                  "RESOLVED_ROLLED_BACK",
+                  "RESOLVED_ABANDONED"
+                ]
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "required": [
+              "resolution"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "title": "Web proposal apply: new skill directory (protocol A)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "opId",
+        "revision",
+        "phase",
+        "createdAt",
+        "updatedAt",
+        "eventsPath",
+        "result",
+        "error",
+        "conflict",
+        "source",
+        "protocol",
+        "proposalId",
+        "targetName",
+        "capClaim",
+        "receiptClaims",
+        "reservationRevisionBefore",
+        "reservationRevisionAfter",
+        "reservationOwner",
+        "stampProgress",
+        "stagingPath",
+        "finalPath",
+        "marker",
+        "expectedAfterContentHash",
+        "expectedAfterStateHash",
+        "backupPath"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "apply"
+        },
+        "opId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "phase": {
+          "enum": [
+            "ABORTED",
+            "AUTHZ_CONSUMED",
+            "CAP_CLAIMED",
+            "COMMITTED",
+            "COMPLETE",
+            "CONFLICT",
+            "FAILED",
+            "INTENT",
+            "META_APPLIED",
+            "PARTIAL",
+            "PROPOSAL_CLAIMED",
+            "RESOLVED_ABANDONED",
+            "RESOLVED_ROLLED_BACK",
+            "RESOLVED_ROLLED_FORWARD",
+            "RESV_CONSUMED",
+            "STAMPS_DONE"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "eventsPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "conflict": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/conflictDiagnostics"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "const": "web-proposal"
+        },
+        "protocol": {
+          "const": "A"
+        },
+        "resolution": {
+          "$ref": "#/$defs/resolutionState"
+        },
+        "proposalId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "targetName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "capClaim": {
+          "$ref": "#/$defs/capClaim"
+        },
+        "receiptClaims": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/receiptClaim"
+          },
+          "minItems": 0
+        },
+        "reservationRevisionBefore": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reservationRevisionAfter": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reservationOwner": {
+          "$ref": "#/$defs/reservationOwner"
+        },
+        "stampProgress": {
+          "$ref": "#/$defs/stampProgress"
+        },
+        "stagingPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "finalPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "marker": {
+          "$ref": "#/$defs/markerAC"
+        },
+        "expectedAfterContentHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "expectedAfterStateHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "backupPath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "COMPLETE"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "$ref": "#/$defs/durableResult"
+              },
+              "error": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "result"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "FAILED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "error": {
+                "$ref": "#/$defs/durableError"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "error"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "CONFLICT"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "PARTIAL"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "ABORTED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "not": {
+                  "enum": [
+                    "COMPLETE",
+                    "ABORTED",
+                    "FAILED",
+                    "CONFLICT",
+                    "PARTIAL",
+                    "RESOLVED_ROLLED_FORWARD",
+                    "RESOLVED_ROLLED_BACK",
+                    "RESOLVED_ABANDONED"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "enum": [
+                  "RESOLVED_ROLLED_FORWARD",
+                  "RESOLVED_ROLLED_BACK",
+                  "RESOLVED_ABANDONED"
+                ]
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "required": [
+              "resolution"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "title": "Web proposal apply: rewrite SKILL.md (protocol B)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "opId",
+        "revision",
+        "phase",
+        "createdAt",
+        "updatedAt",
+        "eventsPath",
+        "result",
+        "error",
+        "conflict",
+        "source",
+        "protocol",
+        "proposalId",
+        "targetName",
+        "capClaim",
+        "receiptClaims",
+        "reservationRevisionBefore",
+        "reservationRevisionAfter",
+        "reservationOwner",
+        "stampProgress",
+        "beforeContentHash",
+        "beforeStateHash",
+        "expectedAfterContentHash",
+        "expectedAfterStateHash",
+        "tmpPath",
+        "finalPath",
+        "backupPath",
+        "marker",
+        "lastCommittedOpId"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "apply"
+        },
+        "opId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "phase": {
+          "enum": [
+            "ABORTED",
+            "AUTHZ_CONSUMED",
+            "CAP_CLAIMED",
+            "COMMITTED",
+            "COMPLETE",
+            "CONFLICT",
+            "FAILED",
+            "INTENT",
+            "META_APPLIED",
+            "PARTIAL",
+            "PROPOSAL_CLAIMED",
+            "RECEIPT_CLAIMED",
+            "RESOLVED_ABANDONED",
+            "RESOLVED_ROLLED_BACK",
+            "RESOLVED_ROLLED_FORWARD",
+            "RESV_CONSUMED",
+            "STAMPS_DONE"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "eventsPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "conflict": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/conflictDiagnostics"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "const": "web-proposal"
+        },
+        "protocol": {
+          "const": "B"
+        },
+        "resolution": {
+          "$ref": "#/$defs/resolutionState"
+        },
+        "proposalId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "targetName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "capClaim": {
+          "$ref": "#/$defs/capClaim"
+        },
+        "receiptClaims": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/receiptClaim"
+          },
+          "minItems": 0
+        },
+        "reservationRevisionBefore": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reservationRevisionAfter": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reservationOwner": {
+          "$ref": "#/$defs/reservationOwner"
+        },
+        "stampProgress": {
+          "$ref": "#/$defs/stampProgress"
+        },
+        "beforeContentHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "beforeStateHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "expectedAfterContentHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "expectedAfterStateHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "tmpPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "finalPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "backupPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "marker": {
+          "$ref": "#/$defs/markerB"
+        },
+        "lastCommittedOpId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "COMPLETE"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "$ref": "#/$defs/durableResult"
+              },
+              "error": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "result"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "FAILED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "error": {
+                "$ref": "#/$defs/durableError"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "error"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "CONFLICT"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "PARTIAL"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "ABORTED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "not": {
+                  "enum": [
+                    "COMPLETE",
+                    "ABORTED",
+                    "FAILED",
+                    "CONFLICT",
+                    "PARTIAL",
+                    "RESOLVED_ROLLED_FORWARD",
+                    "RESOLVED_ROLLED_BACK",
+                    "RESOLVED_ABANDONED"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "enum": [
+                  "RESOLVED_ROLLED_FORWARD",
+                  "RESOLVED_ROLLED_BACK",
+                  "RESOLVED_ABANDONED"
+                ]
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "required": [
+              "resolution"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "title": "Web proposal apply: rollback directory (protocol C)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "opId",
+        "revision",
+        "phase",
+        "createdAt",
+        "updatedAt",
+        "eventsPath",
+        "result",
+        "error",
+        "conflict",
+        "source",
+        "protocol",
+        "proposalId",
+        "targetName",
+        "capClaim",
+        "receiptClaims",
+        "reservationRevisionBefore",
+        "reservationRevisionAfter",
+        "reservationOwner",
+        "stampProgress",
+        "artifactId",
+        "artifactSha256",
+        "artifactPath",
+        "memberManifest",
+        "retiredPath",
+        "stagingPath",
+        "finalPath",
+        "marker",
+        "expectedRestoredContentHash",
+        "expectedRestoredStateHash"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "apply"
+        },
+        "opId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "phase": {
+          "enum": [
+            "ABORTED",
+            "AUTHZ_CONSUMED",
+            "CAP_CLAIMED",
+            "COMMITTED",
+            "COMPLETE",
+            "CONFLICT",
+            "FAILED",
+            "INTENT",
+            "META_APPLIED",
+            "PARTIAL",
+            "PROPOSAL_CLAIMED",
+            "RESOLVED_ABANDONED",
+            "RESOLVED_ROLLED_BACK",
+            "RESOLVED_ROLLED_FORWARD",
+            "RETIRED"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "eventsPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "conflict": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/conflictDiagnostics"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "const": "web-proposal"
+        },
+        "protocol": {
+          "const": "C"
+        },
+        "resolution": {
+          "$ref": "#/$defs/resolutionState"
+        },
+        "proposalId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "targetName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "capClaim": {
+          "$ref": "#/$defs/capClaim"
+        },
+        "receiptClaims": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/receiptClaim"
+          },
+          "minItems": 0
+        },
+        "reservationRevisionBefore": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reservationRevisionAfter": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reservationOwner": {
+          "$ref": "#/$defs/reservationOwner"
+        },
+        "stampProgress": {
+          "$ref": "#/$defs/stampProgress"
+        },
+        "artifactId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "artifactSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "artifactPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "memberManifest": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/member"
+          },
+          "minItems": 1
+        },
+        "retiredPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stagingPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "finalPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "marker": {
+          "$ref": "#/$defs/markerAC"
+        },
+        "expectedRestoredContentHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "expectedRestoredStateHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "COMPLETE"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "$ref": "#/$defs/durableResult"
+              },
+              "error": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "result"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "FAILED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "error": {
+                "$ref": "#/$defs/durableError"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "error"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "CONFLICT"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "PARTIAL"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "ABORTED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "not": {
+                  "enum": [
+                    "COMPLETE",
+                    "ABORTED",
+                    "FAILED",
+                    "CONFLICT",
+                    "PARTIAL",
+                    "RESOLVED_ROLLED_FORWARD",
+                    "RESOLVED_ROLLED_BACK",
+                    "RESOLVED_ABANDONED"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "enum": [
+                  "RESOLVED_ROLLED_FORWARD",
+                  "RESOLVED_ROLLED_BACK",
+                  "RESOLVED_ABANDONED"
+                ]
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "required": [
+              "resolution"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "title": "Autonomous direct create (protocol A)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "opId",
+        "revision",
+        "phase",
+        "createdAt",
+        "updatedAt",
+        "eventsPath",
+        "result",
+        "error",
+        "conflict",
+        "source",
+        "protocol",
+        "action",
+        "targetName",
+        "sourceIds",
+        "reservationKey",
+        "reservationRevisionBefore",
+        "reservationRevisionAfter",
+        "reservationOwner",
+        "stagingPath",
+        "finalPath",
+        "marker",
+        "expectedAfterContentHash",
+        "expectedAfterStateHash",
+        "stampProgress",
+        "configRevision"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "direct"
+        },
+        "opId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "phase": {
+          "enum": [
+            "ABORTED",
+            "COMMITTED",
+            "COMPLETE",
+            "CONFLICT",
+            "FAILED",
+            "INTENT",
+            "PARTIAL",
+            "PREPARED",
+            "RESERVED",
+            "RESOLVED_ABANDONED",
+            "RESOLVED_ROLLED_BACK",
+            "RESOLVED_ROLLED_FORWARD",
+            "RESV_CONSUMED",
+            "STAMPS_DONE"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "eventsPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "conflict": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/conflictDiagnostics"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "const": "autonomous-tool"
+        },
+        "protocol": {
+          "const": "A"
+        },
+        "resolution": {
+          "$ref": "#/$defs/resolutionState"
+        },
+        "action": {
+          "const": "create"
+        },
+        "targetName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "reservationKey": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "reservationRevisionBefore": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reservationRevisionAfter": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "reservationOwner": {
+          "$ref": "#/$defs/reservationOwner"
+        },
+        "stagingPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "finalPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "marker": {
+          "$ref": "#/$defs/markerAC"
+        },
+        "expectedAfterContentHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "expectedAfterStateHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "stampProgress": {
+          "$ref": "#/$defs/stampProgress"
+        },
+        "configRevision": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "COMPLETE"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "$ref": "#/$defs/durableResult"
+              },
+              "error": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "result"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "FAILED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "error": {
+                "$ref": "#/$defs/durableError"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "error"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "CONFLICT"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "PARTIAL"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "ABORTED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "not": {
+                  "enum": [
+                    "COMPLETE",
+                    "ABORTED",
+                    "FAILED",
+                    "CONFLICT",
+                    "PARTIAL",
+                    "RESOLVED_ROLLED_FORWARD",
+                    "RESOLVED_ROLLED_BACK",
+                    "RESOLVED_ABANDONED"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "enum": [
+                  "RESOLVED_ROLLED_FORWARD",
+                  "RESOLVED_ROLLED_BACK",
+                  "RESOLVED_ABANDONED"
+                ]
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "required": [
+              "resolution"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "title": "Autonomous direct refine/fold (protocol B)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "opId",
+        "revision",
+        "phase",
+        "createdAt",
+        "updatedAt",
+        "eventsPath",
+        "result",
+        "error",
+        "conflict",
+        "source",
+        "protocol",
+        "action",
+        "targetName",
+        "beforeContentHash",
+        "beforeStateHash",
+        "expectedAfterContentHash",
+        "expectedAfterStateHash",
+        "tmpPath",
+        "finalPath",
+        "backupPath",
+        "marker",
+        "lastCommittedOpId",
+        "receiptClaims",
+        "stampProgress",
+        "configRevision"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "direct"
+        },
+        "opId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "phase": {
+          "enum": [
+            "ABORTED",
+            "AUTHZ_CONSUMED",
+            "COMMITTED",
+            "COMPLETE",
+            "CONFLICT",
+            "FAILED",
+            "INTENT",
+            "PARTIAL",
+            "RECEIPT_CLAIMED",
+            "RESOLVED_ABANDONED",
+            "RESOLVED_ROLLED_BACK",
+            "RESOLVED_ROLLED_FORWARD",
+            "STAMPS_DONE"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "eventsPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "conflict": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/conflictDiagnostics"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "const": "autonomous-tool"
+        },
+        "protocol": {
+          "const": "B"
+        },
+        "resolution": {
+          "$ref": "#/$defs/resolutionState"
+        },
+        "action": {
+          "enum": [
+            "refine",
+            "fold"
+          ]
+        },
+        "targetName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "beforeContentHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "beforeStateHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "expectedAfterContentHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "expectedAfterStateHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "tmpPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "finalPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "backupPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "marker": {
+          "$ref": "#/$defs/markerB"
+        },
+        "lastCommittedOpId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "receiptClaims": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/receiptClaim"
+          },
+          "minItems": 1
+        },
+        "stampProgress": {
+          "$ref": "#/$defs/stampProgress"
+        },
+        "configRevision": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "COMPLETE"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "$ref": "#/$defs/durableResult"
+              },
+              "error": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "result"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "FAILED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "error": {
+                "$ref": "#/$defs/durableError"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "error"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "CONFLICT"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "PARTIAL"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "ABORTED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "not": {
+                  "enum": [
+                    "COMPLETE",
+                    "ABORTED",
+                    "FAILED",
+                    "CONFLICT",
+                    "PARTIAL",
+                    "RESOLVED_ROLLED_FORWARD",
+                    "RESOLVED_ROLLED_BACK",
+                    "RESOLVED_ABANDONED"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "enum": [
+                  "RESOLVED_ROLLED_FORWARD",
+                  "RESOLVED_ROLLED_BACK",
+                  "RESOLVED_ABANDONED"
+                ]
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "required": [
+              "resolution"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "title": "Converge from web-proposal",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "opId",
+        "revision",
+        "phase",
+        "createdAt",
+        "updatedAt",
+        "eventsPath",
+        "result",
+        "error",
+        "conflict",
+        "source",
+        "proposalId",
+        "targetName",
+        "target",
+        "resources",
+        "receiptClaims",
+        "configRevision",
+        "capClaim"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "converge"
+        },
+        "opId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "phase": {
+          "enum": [
+            "ABORTED",
+            "ARCHIVE_FINALIZED",
+            "COMMITTED",
+            "COMPLETE",
+            "CONFLICT",
+            "FAILED",
+            "PARTIAL",
+            "PREPARED",
+            "RESOLVED_ABANDONED",
+            "RESOLVED_ROLLED_BACK",
+            "RESOLVED_ROLLED_FORWARD",
+            "SOURCES_STAGED"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "eventsPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "conflict": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/conflictDiagnostics"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "const": "web-proposal"
+        },
+        "resolution": {
+          "$ref": "#/$defs/resolutionState"
+        },
+        "proposalId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "targetName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "$ref": "#/$defs/resource"
+        },
+        "resources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/resource"
+          },
+          "minItems": 2
+        },
+        "receiptClaims": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/receiptClaim"
+          },
+          "minItems": 1
+        },
+        "configRevision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "capClaim": {
+          "$ref": "#/$defs/capClaim"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "COMPLETE"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "$ref": "#/$defs/durableResult"
+              },
+              "error": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "result"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "FAILED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "error": {
+                "$ref": "#/$defs/durableError"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "error"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "CONFLICT"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "PARTIAL"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "ABORTED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "not": {
+                  "enum": [
+                    "COMPLETE",
+                    "ABORTED",
+                    "FAILED",
+                    "CONFLICT",
+                    "PARTIAL",
+                    "RESOLVED_ROLLED_FORWARD",
+                    "RESOLVED_ROLLED_BACK",
+                    "RESOLVED_ABANDONED"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "enum": [
+                  "RESOLVED_ROLLED_FORWARD",
+                  "RESOLVED_ROLLED_BACK",
+                  "RESOLVED_ABANDONED"
+                ]
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "required": [
+              "resolution"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "title": "Converge from autonomous-tool",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "opId",
+        "revision",
+        "phase",
+        "createdAt",
+        "updatedAt",
+        "eventsPath",
+        "result",
+        "error",
+        "conflict",
+        "source",
+        "proposalId",
+        "targetName",
+        "target",
+        "resources",
+        "receiptClaims",
+        "configRevision"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "converge"
+        },
+        "opId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "phase": {
+          "enum": [
+            "ABORTED",
+            "ARCHIVE_FINALIZED",
+            "COMMITTED",
+            "COMPLETE",
+            "CONFLICT",
+            "FAILED",
+            "PARTIAL",
+            "PREPARED",
+            "RESOLVED_ABANDONED",
+            "RESOLVED_ROLLED_BACK",
+            "RESOLVED_ROLLED_FORWARD",
+            "SOURCES_STAGED"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "eventsPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "conflict": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/conflictDiagnostics"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "const": "autonomous-tool"
+        },
+        "resolution": {
+          "$ref": "#/$defs/resolutionState"
+        },
+        "proposalId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "targetName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "$ref": "#/$defs/resource"
+        },
+        "resources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/resource"
+          },
+          "minItems": 2
+        },
+        "receiptClaims": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/receiptClaim"
+          },
+          "minItems": 1
+        },
+        "configRevision": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "COMPLETE"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "$ref": "#/$defs/durableResult"
+              },
+              "error": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "result"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "FAILED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "error": {
+                "$ref": "#/$defs/durableError"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "error"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "CONFLICT"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "PARTIAL"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "ABORTED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "not": {
+                  "enum": [
+                    "COMPLETE",
+                    "ABORTED",
+                    "FAILED",
+                    "CONFLICT",
+                    "PARTIAL",
+                    "RESOLVED_ROLLED_FORWARD",
+                    "RESOLVED_ROLLED_BACK",
+                    "RESOLVED_ABANDONED"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "enum": [
+                  "RESOLVED_ROLLED_FORWARD",
+                  "RESOLVED_ROLLED_BACK",
+                  "RESOLVED_ABANDONED"
+                ]
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "required": [
+              "resolution"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "title": "Web archive/restore move (protocol D)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "opId",
+        "revision",
+        "phase",
+        "createdAt",
+        "updatedAt",
+        "eventsPath",
+        "result",
+        "error",
+        "conflict",
+        "source",
+        "protocol",
+        "action",
+        "sourceKey",
+        "destKey",
+        "beforeTreeHash",
+        "committedTreeHash",
+        "marker",
+        "logicalSkillName",
+        "archiveId",
+        "configRevision",
+        "capClaim"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "move"
+        },
+        "opId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "phase": {
+          "enum": [
+            "ABORTED",
+            "COMMITTED",
+            "COMPLETE",
+            "CONFLICT",
+            "FAILED",
+            "INTENT",
+            "PARTIAL",
+            "RESOLVED_ABANDONED",
+            "RESOLVED_ROLLED_BACK",
+            "RESOLVED_ROLLED_FORWARD"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "eventsPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "conflict": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/conflictDiagnostics"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "const": "web-proposal"
+        },
+        "protocol": {
+          "const": "D"
+        },
+        "resolution": {
+          "$ref": "#/$defs/resolutionState"
+        },
+        "action": {
+          "enum": [
+            "archive",
+            "restore"
+          ]
+        },
+        "sourceKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "destKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "beforeTreeHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "committedTreeHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "marker": {
+          "$ref": "#/$defs/markerD"
+        },
+        "logicalSkillName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "archiveId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configRevision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "capClaim": {
+          "$ref": "#/$defs/capClaim"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "COMPLETE"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "$ref": "#/$defs/durableResult"
+              },
+              "error": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "result"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "FAILED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "error": {
+                "$ref": "#/$defs/durableError"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "error"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "CONFLICT"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "PARTIAL"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "ABORTED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "not": {
+                  "enum": [
+                    "COMPLETE",
+                    "ABORTED",
+                    "FAILED",
+                    "CONFLICT",
+                    "PARTIAL",
+                    "RESOLVED_ROLLED_FORWARD",
+                    "RESOLVED_ROLLED_BACK",
+                    "RESOLVED_ABANDONED"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "enum": [
+                  "RESOLVED_ROLLED_FORWARD",
+                  "RESOLVED_ROLLED_BACK",
+                  "RESOLVED_ABANDONED"
+                ]
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "required": [
+              "resolution"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "title": "Model-tool archive/restore move (protocol D)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "opId",
+        "revision",
+        "phase",
+        "createdAt",
+        "updatedAt",
+        "eventsPath",
+        "result",
+        "error",
+        "conflict",
+        "source",
+        "protocol",
+        "action",
+        "sourceKey",
+        "destKey",
+        "beforeTreeHash",
+        "committedTreeHash",
+        "marker",
+        "logicalSkillName",
+        "archiveId",
+        "configRevision"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "move"
+        },
+        "opId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "phase": {
+          "enum": [
+            "ABORTED",
+            "COMMITTED",
+            "COMPLETE",
+            "CONFLICT",
+            "FAILED",
+            "INTENT",
+            "PARTIAL",
+            "RESOLVED_ABANDONED",
+            "RESOLVED_ROLLED_BACK",
+            "RESOLVED_ROLLED_FORWARD"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "eventsPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "conflict": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/conflictDiagnostics"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "const": "model-tool"
+        },
+        "protocol": {
+          "const": "D"
+        },
+        "resolution": {
+          "$ref": "#/$defs/resolutionState"
+        },
+        "action": {
+          "enum": [
+            "archive",
+            "restore"
+          ]
+        },
+        "sourceKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "destKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "beforeTreeHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "committedTreeHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "marker": {
+          "$ref": "#/$defs/markerD"
+        },
+        "logicalSkillName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "archiveId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configRevision": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "COMPLETE"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "$ref": "#/$defs/durableResult"
+              },
+              "error": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "result"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "FAILED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "error": {
+                "$ref": "#/$defs/durableError"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "error"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "CONFLICT"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "PARTIAL"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "ABORTED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "not": {
+                  "enum": [
+                    "COMPLETE",
+                    "ABORTED",
+                    "FAILED",
+                    "CONFLICT",
+                    "PARTIAL",
+                    "RESOLVED_ROLLED_FORWARD",
+                    "RESOLVED_ROLLED_BACK",
+                    "RESOLVED_ABANDONED"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "enum": [
+                  "RESOLVED_ROLLED_FORWARD",
+                  "RESOLVED_ROLLED_BACK",
+                  "RESOLVED_ABANDONED"
+                ]
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "required": [
+              "resolution"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "title": "Automatic archive move (protocol D)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "opId",
+        "revision",
+        "phase",
+        "createdAt",
+        "updatedAt",
+        "eventsPath",
+        "result",
+        "error",
+        "conflict",
+        "source",
+        "protocol",
+        "action",
+        "sourceKey",
+        "destKey",
+        "beforeTreeHash",
+        "committedTreeHash",
+        "marker",
+        "logicalSkillName",
+        "archiveId",
+        "configRevision"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "move"
+        },
+        "opId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "phase": {
+          "enum": [
+            "ABORTED",
+            "COMMITTED",
+            "COMPLETE",
+            "CONFLICT",
+            "FAILED",
+            "INTENT",
+            "PARTIAL",
+            "RESOLVED_ABANDONED",
+            "RESOLVED_ROLLED_BACK",
+            "RESOLVED_ROLLED_FORWARD"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "eventsPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "conflict": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/conflictDiagnostics"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "const": "auto"
+        },
+        "protocol": {
+          "const": "D"
+        },
+        "resolution": {
+          "$ref": "#/$defs/resolutionState"
+        },
+        "action": {
+          "const": "autoArchive"
+        },
+        "sourceKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "destKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "beforeTreeHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "committedTreeHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "marker": {
+          "$ref": "#/$defs/markerD"
+        },
+        "logicalSkillName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "archiveId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configRevision": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "COMPLETE"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "$ref": "#/$defs/durableResult"
+              },
+              "error": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "result"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "FAILED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "error": {
+                "$ref": "#/$defs/durableError"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "error"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "CONFLICT"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "PARTIAL"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "ABORTED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "not": {
+                  "enum": [
+                    "COMPLETE",
+                    "ABORTED",
+                    "FAILED",
+                    "CONFLICT",
+                    "PARTIAL",
+                    "RESOLVED_ROLLED_FORWARD",
+                    "RESOLVED_ROLLED_BACK",
+                    "RESOLVED_ABANDONED"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "enum": [
+                  "RESOLVED_ROLLED_FORWARD",
+                  "RESOLVED_ROLLED_BACK",
+                  "RESOLVED_ABANDONED"
+                ]
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "required": [
+              "resolution"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "title": "Operator resolution of a CONFLICT/PARTIAL operation",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "opId",
+        "revision",
+        "phase",
+        "createdAt",
+        "updatedAt",
+        "eventsPath",
+        "result",
+        "error",
+        "conflict",
+        "source",
+        "resolvesOpId",
+        "resolvedKind",
+        "decision",
+        "capClaim",
+        "releasedCapId",
+        "releasedReceiptIds",
+        "observedConflictHash",
+        "targetName"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "resolution"
+        },
+        "opId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "phase": {
+          "enum": [
+            "CLAIMED",
+            "INTENT",
+            "APPLIED",
+            "COMPLETE",
+            "FAILED",
+            "ABORTED"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "eventsPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "conflict": {
+          "type": "null"
+        },
+        "source": {
+          "const": "web-user"
+        },
+        "resolvesOpId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resolvedKind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision": {
+          "enum": [
+            "roll-forward",
+            "rollback",
+            "abandon"
+          ]
+        },
+        "capClaim": {
+          "$ref": "#/$defs/capClaim"
+        },
+        "releasedCapId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "releasedReceiptIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        },
+        "observedConflictHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "targetName": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "COMPLETE"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "$ref": "#/$defs/durableResult"
+              },
+              "error": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "result"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "FAILED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "error": {
+                "$ref": "#/$defs/durableError"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "error"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "CONFLICT"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "PARTIAL"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "ABORTED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "not": {
+                  "enum": [
+                    "COMPLETE",
+                    "ABORTED",
+                    "FAILED",
+                    "CONFLICT",
+                    "PARTIAL",
+                    "RESOLVED_ROLLED_FORWARD",
+                    "RESOLVED_ROLLED_BACK",
+                    "RESOLVED_ABANDONED"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "enum": [
+                  "RESOLVED_ROLLED_FORWARD",
+                  "RESOLVED_ROLLED_BACK",
+                  "RESOLVED_ABANDONED"
+                ]
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "required": [
+              "resolution"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "title": "Ownership key rotation",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "opId",
+        "revision",
+        "phase",
+        "createdAt",
+        "updatedAt",
+        "eventsPath",
+        "result",
+        "error",
+        "conflict",
+        "fromKeyId",
+        "toKeyId",
+        "ownerRevisionBefore",
+        "ownerRevisionAfter",
+        "scannedAssets",
+        "verifiedAssets",
+        "namespaceLockOwner"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "rotation"
+        },
+        "opId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "phase": {
+          "enum": [
+            "ABORTED",
+            "ACTIVE_SWITCHED",
+            "COMPLETE",
+            "CONFLICT",
+            "DUAL_KEY_PERSISTED",
+            "FAILED",
+            "PARTIAL",
+            "RESIGNING",
+            "RESOLVED_ABANDONED",
+            "RESOLVED_ROLLED_BACK",
+            "RESOLVED_ROLLED_FORWARD",
+            "VERIFIED"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "eventsPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/durableError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "conflict": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/conflictDiagnostics"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "resolution": {
+          "$ref": "#/$defs/resolutionState"
+        },
+        "fromKeyId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "toKeyId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ownerRevisionBefore": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ownerRevisionAfter": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "scannedAssets": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        },
+        "verifiedAssets": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        },
+        "namespaceLockOwner": {
+          "$ref": "#/$defs/lockOwner"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "COMPLETE"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "$ref": "#/$defs/durableResult"
+              },
+              "error": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "result"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "FAILED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "error": {
+                "$ref": "#/$defs/durableError"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "error"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "CONFLICT"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              },
+              "result": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "PARTIAL"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict": {
+                "$ref": "#/$defs/conflictDiagnostics"
+              }
+            },
+            "required": [
+              "conflict"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "ABORTED"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "not": {
+                  "enum": [
+                    "COMPLETE",
+                    "ABORTED",
+                    "FAILED",
+                    "CONFLICT",
+                    "PARTIAL",
+                    "RESOLVED_ROLLED_FORWARD",
+                    "RESOLVED_ROLLED_BACK",
+                    "RESOLVED_ABANDONED"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "enum": [
+                  "RESOLVED_ROLLED_FORWARD",
+                  "RESOLVED_ROLLED_BACK",
+                  "RESOLVED_ABANDONED"
+                ]
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "required": [
+              "resolution"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "$defs": {
+    "resolutionState": {
+      "title": "Resolution CAS state on a freezable operation",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "UNRESOLVED",
+            "RESOLVING",
+            "RESOLVED"
+          ]
+        },
+        "resolutionOpId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "decision": {
+          "anyOf": [
+            {
+              "enum": [
+                "roll-forward",
+                "rollback",
+                "abandon"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "resolvedAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "capClaim": {
+      "title": "Capability claim",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capId",
+        "purpose",
+        "digest",
+        "claimedByOpId",
+        "state"
+      ],
+      "properties": {
+        "capId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "claimedByOpId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state": {
+          "enum": [
+            "claimed",
+            "consumed",
+            "available"
+          ]
+        }
+      }
+    },
+    "receiptClaim": {
+      "title": "Usage receipt claim",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receiptId",
+        "skillName",
+        "callId",
+        "state"
+      ],
+      "properties": {
+        "receiptId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "skillName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "callId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state": {
+          "enum": [
+            "claimed",
+            "consumed",
+            "available"
+          ]
+        }
+      }
+    },
+    "markerAC": {
+      "title": "Commit marker (protocol A/C: directory publish)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "opId",
+        "protocol",
+        "action",
+        "expectedAfterContentHash",
+        "expectedAfterStateHash"
+      ],
+      "properties": {
+        "opId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "protocol": {
+          "enum": [
+            "A",
+            "C"
+          ]
+        },
+        "action": {
+          "enum": [
+            "create",
+            "converge",
+            "rollback"
+          ]
+        },
+        "expectedAfterContentHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "expectedAfterStateHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "markerB": {
+      "title": "Commit marker (protocol B: in-place SKILL.md state)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "opId",
+        "protocol",
+        "action",
+        "expectedAfterContentHash",
+        "expectedAfterStateHash",
+        "lastCommittedOpId"
+      ],
+      "properties": {
+        "opId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "protocol": {
+          "const": "B"
+        },
+        "action": {
+          "enum": [
+            "refine",
+            "fold"
+          ]
+        },
+        "expectedAfterContentHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "expectedAfterStateHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "lastCommittedOpId": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "markerD": {
+      "title": "Commit marker (protocol D: tree move, no content hash)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "opId",
+        "protocol",
+        "action",
+        "logicalSkillName",
+        "archiveId"
+      ],
+      "properties": {
+        "opId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "protocol": {
+          "const": "D"
+        },
+        "action": {
+          "enum": [
+            "archive",
+            "restore",
+            "autoArchive"
+          ]
+        },
+        "logicalSkillName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "archiveId": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "reservationOwner": {
+      "title": "Reservation owner",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proposalId",
+        "opId"
+      ],
+      "properties": {
+        "proposalId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "opId": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "stampProgress": {
+      "title": "Evidence stamp progress",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "done",
+        "pending"
+      ],
+      "properties": {
+        "done": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        },
+        "pending": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        }
+      }
+    },
+    "member": {
+      "title": "Validated tar member",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "type",
+        "size",
+        "mode",
+        "contentHash"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "enum": [
+            "file",
+            "directory"
+          ]
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mode": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "contentHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "resource": {
+      "title": "Converge resource",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "name",
+        "beforePath",
+        "stagingPath",
+        "finalPath",
+        "beforeContentHash",
+        "beforeStateHash",
+        "afterContentHash",
+        "afterStateHash",
+        "backupPath",
+        "status"
+      ],
+      "properties": {
+        "role": {
+          "enum": [
+            "source",
+            "target"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "beforePath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "stagingPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "finalPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "archiveId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "beforeContentHash": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "beforeStateHash": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "afterContentHash": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "afterStateHash": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "backupPath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "staged",
+            "committed",
+            "archived",
+            "rolled-back"
+          ]
+        }
+      }
+    },
+    "lockOwner": {
+      "title": "Fenced lock owner",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instanceId",
+        "opId",
+        "pid",
+        "processStartToken",
+        "bootId",
+        "acquiredAt",
+        "ttlMs"
+      ],
+      "properties": {
+        "instanceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "opId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pid": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "processStartToken": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bootId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "acquiredAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "ttlMs": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "durableResult": {
+      "title": "Durable idempotent result",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome",
+        "receipt",
+        "completedAt"
+      ],
+      "properties": {
+        "outcome": {
+          "enum": [
+            "ok",
+            "degraded"
+          ]
+        },
+        "receipt": {
+          "title": "Idempotent replay receipt",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "opId",
+            "kind",
+            "targetName"
+          ],
+          "properties": {
+            "opId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kind": {
+              "type": "string",
+              "minLength": 1
+            },
+            "targetName": {
+              "type": "string",
+              "minLength": 1
+            },
+            "archiveId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "finalPath": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "afterContentHash": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "completedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "durableError": {
+      "title": "Durable failure",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message",
+        "at"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "conflictDiagnostics": {
+      "title": "Conflict/partial diagnostics",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message",
+        "resources",
+        "at"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resources": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}

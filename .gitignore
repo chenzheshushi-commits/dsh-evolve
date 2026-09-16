@@ -1,5 +1,6 @@
 node_modules/
-pnpm-lock.yaml
+# pnpm-lock.yaml is COMMITTED on purpose: without it every clone resolves its
+# own dependency tree, and `pnpm add` damage cannot be undone with git.
 
 # Internal working docs — not part of the public repo
 HERMES_USAGE.md
@@ -13,3 +14,8 @@ _EVAL_PENDING.md
 
 # Internal plans/scratch — never in public repo
 .hermes/
+
+
+# Python bytecode from scripts/schema/ contracts
+__pycache__/
+*.py[cod]

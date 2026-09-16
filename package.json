@@ -1,6 +1,7 @@
 {
   "name": "dsh-evolve",
   "version": "0.5.2",
+  "packageManager": "pnpm@12.4.1",
   "description": "Self-evolving memory + skill lifecycle for DeepSeek Harness. Cross-session memory with zero-token deterministic recall (bigram-Jaccard fused with FTS5 BM25 via RRF), a tiered approval gate, and reinforcement that strengthens what you repeat. Procedural knowledge crystallizes into SKILL.md files that refine in place and are curated through an active-stale-archived lifecycle (reversible archive, pre-op backups, rollback, never deletes). Includes background per-turn review, anti-bloat convergence for both skills and memory, an auto-grown user profile, and a web settings page.",
   "keywords": [
     "dsh",
@@ -66,26 +67,28 @@
     "react": "^18.2.0"
   },
   "dependencies": {
+    "ajv": "^8.20.0",
     "schemastery": "^3.18.0"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-client-connection": "^0.1.0-rc.7",
+    "@deepseek-ai/dsh-client-runtime": "^0.1.0-rc.7",
+    "@deepseek-ai/dsh-client-ui-settings": "^0.1.0-rc.7",
+    "@deepseek-ai/dsh-client-ui-slots": "^0.1.0-rc.7",
+    "@deepseek-ai/dsh-host-webserver": "^0.1.0-rc.7",
     "@deepseek-ai/dsh-llm": "^0.1.0-rc.7",
-    "@deepseek-ai/dsh-tools": "^0.1.0-rc.7",
+    "@deepseek-ai/dsh-settings": "^0.1.0-rc.7",
     "@deepseek-ai/dsh-storage": "^0.1.0-rc.7",
     "@deepseek-ai/dsh-storage-domain": "^0.1.0-rc.7",
     "@deepseek-ai/dsh-system-prompt": "^0.1.0-rc.7",
-    "@deepseek-ai/dsh-host-webserver": "^0.1.0-rc.7",
-    "@deepseek-ai/dsh-settings": "^0.1.0-rc.7",
+    "@deepseek-ai/dsh-tools": "^0.1.0-rc.7",
     "@deepseek-ai/schemastery": "^3.18.1",
-    "@deepseek-ai/dsh-client-runtime": "^0.1.0-rc.7",
-    "@deepseek-ai/dsh-client-connection": "^0.1.0-rc.7",
-    "@deepseek-ai/dsh-client-ui-settings": "^0.1.0-rc.7",
-    "@deepseek-ai/dsh-client-ui-slots": "^0.1.0-rc.7",
     "@types/node": "^22.20.0",
     "@types/react": "~18.3.1",
     "react": "^18.3.1",
     "tsdown": "0.22.2",
-    "typescript": "~5.7.2"
+    "typescript": "~5.7.2",
+    "unrun": "^0.3.1"
   }
 }
