@@ -13,7 +13,7 @@ function makeStore(events) {
 }
 
 test('diag is irreversible and contains no raw query field',()=>{
-  const q='查 UPS timeout Bearer ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890';
+  const q='查 UPS timeout Bearer '+('A'.repeat(36));
   const d=buildRecallDiag(q,{hits:2,ms:3.5,path:'fused',source:'manual'});
   assert.equal(d.event,'recall'); assert.equal(d.queryHash.length,64); assert.equal(d.queryLen,q.length);
   assert.ok(d.tokenCount>0); assert.equal(d.scriptClass,'mixed-cjk-latin'); assert.equal(d.hits,2); assert.equal(d.ms,3.5);
