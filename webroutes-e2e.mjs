@@ -160,15 +160,23 @@ await store.remember({ content: '一条待确认记忆', kind: 'note', importanc
   assert.equal(res.statusCode, 200, 'set-config disposalMode 200')
   assert.equal(cfg.disposalMode, 'suggest', 'set-config mutated cfg.disposalMode -> suggest')
   assert.equal(cfg.disposalMinIdleDays, 14, 'set-config mutated cfg.disposalMinIdleDays -> 14')
-  // illegal disposal tier rejected (tidy is NOT a shipped tier in v0.5.0)
+  // v0.6.0 tidy is a real tier and must survive the full HTTP round-trip.
+  const tidy = mockRes()
+  await R['/api/evolve/action'].handler(mockReq({ method: 'POST', body: { action: 'set-config', disposalMode: 'tidy', tidyMaxPerRun: 7 } }), tidy)
+  assert.equal(tidy.statusCode, 200, 'disposalMode tidy is accepted')
+  assert.equal(cfg.disposalMode, 'tidy')
+  assert.equal(cfg.tidyMaxPerRun, 7)
+  // unknown tiers are still rejected.
   const bad = mockRes()
-  await R['/api/evolve/action'].handler(mockReq({ method: 'POST', body: { action: 'set-config', disposalMode: 'tidy' } }), bad)
-  assert.equal(bad.statusCode, 400, 'disposalMode tidy (not shipped) → 400')
+  await R['/api/evolve/action'].handler(mockReq({ method: 'POST', body: { action: 'set-config', disposalMode: 'delete-everything' } }), bad)
+  assert.equal(bad.statusCode, 400, 'unknown disposal tier → 400')
   // /state carries the disposalSuggest snapshot
   const st = mockRes()
   await R['/api/evolve/state'].handler(mockReq({ method: 'GET' }), st)
   const sbody = JSON.parse(st.body)
   assert.ok('disposalSuggest' in (sbody ?? {}), '/state includes disposalSuggest snapshot')
+  assert.equal(sbody.config.disposalMode, 'tidy', '/state reads tidy back')
+  assert.equal(sbody.config.tidyMaxPerRun, 7, '/state reads tidy quota back')
   console.log('OK web disposalMode: round-trips, tidy rejected (400), /state carries suggest snapshot')
 }
 

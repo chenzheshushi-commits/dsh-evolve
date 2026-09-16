@@ -48,8 +48,8 @@ interface EvolveState {
     refineLLM: boolean; refineProvider: string; refineModel: string; tier1Enabled: boolean
     approvalMode: 'manual' | 'balanced' | 'autonomous'
     reviewMaxAutoPerTurn: number; maxPendingQueue: number
-    disposalMode: 'manual' | 'suggest'
-    disposalMinIdleDays: number
+    disposalMode: 'manual' | 'suggest' | 'tidy'
+    disposalMinIdleDays: number; tidyMaxPerRun: number; idleMinutes: number
   }
   models: ModelRow[]
   memoryStats: {
@@ -416,11 +416,12 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
       {/* ── Block 2.4: 处置自治程度 (v0.5.0 direction 2) ── */}
       <div style={box}>
         <b>记忆处置自治程度</b>
-        <div style={dim}>决定「系统要不要主动提议清理冷记忆」。注意：处置永远只到「提议」——任何档位都不会自动删除，删不删由你在下方受控剪枝里勾选。（技能的合并/归档永远手动，不进自动提议。）</div>
+        <div style={dim}>决定系统如何处理冷记忆。手动/建议档不改数据；整理档只会自动「软删」符合严格规则的低价值记忆，可在下方已忘记区恢复。任何档位都不会自动物理删除，技能合并/归档也仍为手动。</div>
         <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {([
             ['manual', '手动', '系统不主动提议。你自己在下方受控剪枝里筛选处理。'],
             ['suggest', '建议', '空闲时自动重算「从未注入、从未召回、且过了冷静期」的低价值记忆，列给你看；仍然只提议、不自动删。'],
+            ['tidy', '整理', '空闲时自动软删同一批建议候选；每轮最多处理设定数量，可恢复，绝不物理删除；最高重要度、偏好、决策、待审、已拒绝和锁定项永不自动处理。'],
           ] as const).map(([mode, label, desc]) => {
             const active = (cfg?.disposalMode ?? 'manual') === mode
             return (
@@ -436,7 +437,29 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
             )
           })}
         </div>
-        {cfg?.disposalMode === 'suggest' && s?.disposalSuggest ? (
+        {(cfg?.disposalMode === 'suggest' || cfg?.disposalMode === 'tidy') ? (
+          <label style={{ display: 'block', marginTop: 10 }}>
+            空闲触发时间：
+            <input type="number" min={1} max={1440}
+              style={{ width: 80, marginLeft: 8, padding: '4px 6px', borderRadius: 4, border: '1px solid var(--dsh-border, #444)' }}
+              value={cfg.idleMinutes ?? 5} disabled={saving}
+              onChange={(e) => void setConfig({ idleMinutes: Number(e.target.value) })}
+            /> 分钟
+          </label>
+        ) : null}
+        {cfg?.disposalMode === 'tidy' ? (
+          <label style={{ display: 'block', marginTop: 10 }}>
+            每轮最多自动软删：
+            <input
+              type="number" min={1} max={100}
+              style={{ width: 80, marginLeft: 8, padding: '4px 6px', borderRadius: 4, border: '1px solid var(--dsh-border, #444)' }}
+              value={cfg.tidyMaxPerRun ?? 5}
+              disabled={saving}
+              onChange={(e) => void setConfig({ tidyMaxPerRun: Number(e.target.value) })}
+            /> 条
+          </label>
+        ) : null}
+        {(cfg?.disposalMode === 'suggest' || cfg?.disposalMode === 'tidy') && s?.disposalSuggest ? (
           <div style={{ marginTop: 10 }}>
             <div style={dim}>冷静期：{cfg?.disposalMinIdleDays ?? 30} 天。空闲时自动重算，{s.disposalSuggest.computedAt ? `上次算于 ${new Date(s.disposalSuggest.computedAt).toLocaleString()}` : '（还未触发，需空闲一段时间）'}</div>
             {s.disposalSuggest.candidates.length > 0 ? (
