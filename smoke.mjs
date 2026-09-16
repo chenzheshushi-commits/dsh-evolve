@@ -399,6 +399,16 @@ function makeStoreTable() {
   return {
     put(k, v) { m.set(k, v); return true; }, get(k) { return m.get(k); },
     delete(k) { return m.delete(k); }, entries() { return [...m.entries()]; },
+    // Mirrors the storage domain's real update(): the callback runs against the
+    // CURRENT value, and a missing key throws `missing-key` rather than creating
+    // one. A mock without this let a store bug hide -- every chain-internal write
+    // silently fell into its retry path and nothing was ever persisted.
+    async update(k, fn) {
+      if (!m.has(k)) { const e = new Error(`missing-key: ${k}`); e.code = 'missing-key'; throw e; }
+      const next = fn(m.get(k));
+      m.set(k, next);
+      return next;
+    },
     get size() { return m.size; },
   };
 }
