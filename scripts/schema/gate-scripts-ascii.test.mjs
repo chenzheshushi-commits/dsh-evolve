@@ -44,3 +44,28 @@ test('the Python contract gates are ASCII-only, so a Windows console can print t
     'non-ASCII in a gate script will raise UnicodeEncodeError on a Windows console '
     + `and fail the gate for an encoding reason:\n  ${offenders.join('\n  ')}`);
 });
+
+
+/**
+ * The gates' Python dependencies must be declared where a human rebuilding the
+ * environment will find them, and CI must install from that same file.
+ *
+ * They used to exist only inside verify.yml, so `npm run test:contracts` on a
+ * fresh machine died with ModuleNotFoundError and the reason -- that
+ * rfc3339-validator is load-bearing, not optional -- was knowledge trapped in a
+ * workflow file.
+ */
+test('the gates\' Python dependencies are declared once and used by CI', () => {
+  const req = readFileSync(new URL('./requirements.txt', import.meta.url), 'utf8');
+  for (const pkg of ['jsonschema', 'rfc3339-validator']) {
+    assert.ok(req.includes(pkg), `requirements.txt must pin ${pkg}`);
+  }
+  assert.match(req, /jsonschema\[format\]/,
+    'jsonschema must be installed with the [format] extra, or date-time checking is a no-op');
+
+  const wf = readFileSync(new URL('../../.github/workflows/verify.yml', import.meta.url), 'utf8');
+  assert.match(wf, /-r scripts\/schema\/requirements\.txt/,
+    'CI must install from requirements.txt so the pinned versions cannot drift apart');
+  assert.equal(/pip install[^\n]*jsonschema\[format\]==/.test(wf), false,
+    'CI must not re-pin versions inline; that is the drift this file prevents');
+});

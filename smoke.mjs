@@ -915,8 +915,16 @@ function makeStoreTable() {
     'R1: real hit outranks stopword-fragment coincidence on long record',
   );
   // R1 guard (b) + precision red-line: an unrelated query must NOT surface the pref record.
-  assert.equal(scoreRecord(pref, '编程语言'), 0, 'R1: 编程语言 does not false-match 中文偏好 (precision)');
-  assert.equal(scoreRecord(pref, '自然语言'), 0, 'R1: 自然语言 does not false-match 中文偏好 (precision)');
+  //
+  // ⚠ THESE TWO PASS FOR THE WRONG REASON. They hold only because THIS fixture's
+  // content happens not to contain 「语言」. A preference phrased the ordinary way
+  // ('用户偏好：回复语言必须是中文') scores 1.41 against 编程语言 -- the red-line is
+  // not held by the algorithm, it is held by the fixture. Do not read these as
+  // "precision is guarded".
+  // The real state of this hole, with measurements and why raising the floor cannot
+  // fix it: scripts/schema/f3-precision-hole.test.mjs (a failing test.todo).
+  assert.equal(scoreRecord(pref, '编程语言'), 0, 'R1: 编程语言 does not false-match THIS 中文偏好 fixture (see f3-precision-hole)');
+  assert.equal(scoreRecord(pref, '自然语言'), 0, 'R1: 自然语言 does not false-match THIS 中文偏好 fixture (see f3-precision-hole)');
   // R2: adaptive threshold — strict for short queries, relaxed (≥0.6) for long ones.
   assert.equal(matchBaseMin('语言'), 1.0, 'R2: short 2-char CN query keeps strict 1.0 floor');
   assert.ok(matchBaseMin('要求用什么语言回复') < 1.0 && matchBaseMin('要求用什么语言回复') >= 0.6, 'R2: long query relaxes toward 0.6 floor');

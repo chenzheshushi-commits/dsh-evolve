@@ -50,7 +50,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install --disable-pip-version-check "jsonschema[format]==4.23.0" rfc3339-validator==0.1.4
+      - run: python -m pip install --disable-pip-version-check -r scripts/schema/requirements.txt
       - name: date-time format checking is actually live
         run: python -c "from jsonschema import Draft202012Validator as V; p=V({'type':'string','format':'date-time'}, format_checker=V.FORMAT_CHECKER); assert not p.is_valid('not-a-date'), 'format checker is a no-op'; print('date-time format enforced')"
 

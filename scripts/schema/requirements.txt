@@ -1,0 +1,17 @@
+# Python dependencies for the contract gates in this directory.
+#
+# jsonschema alone is NOT enough. Without rfc3339-validator, jsonschema silently
+# ignores the "date-time" format keyword: verify_op_manifest_schema.py then prints
+# PASS for "date-time format is live" while enforcing nothing, and the negative
+# case "createdAt not a date" stops being rejected. A gate that reports success
+# while checking nothing is worse than no gate, so the extra is a hard requirement.
+#
+# Install:  python3 -m pip install -r scripts/schema/requirements.txt
+# Verify:   python3 -c "from jsonschema import Draft202012Validator as V; \
+#             p=V({'type':'string','format':'date-time'}, format_checker=V.FORMAT_CHECKER); \
+#             assert not p.is_valid('not-a-date')"
+#
+# Versions are pinned to match .github/workflows/verify.yml exactly, so a local
+# run and CI cannot disagree about what the gates enforce.
+jsonschema[format]==4.23.0
+rfc3339-validator==0.1.4

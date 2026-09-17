@@ -39,7 +39,7 @@ dsh plugin --profile web add github:chenzheshushi-commits/dsh-evolve
 Pin a specific release instead of tracking `main`:
 
 ```bash
-dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.6.1/dsh-evolve-0.6.1.tgz"
+dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.6.2/dsh-evolve-0.6.2.tgz"
 ```
 
 Then restart the harness — tools are discovered at startup, not hot-reloaded.
@@ -185,6 +185,53 @@ behavior on failure. Nothing runs in your main loop.
 - **No internal timers.** In-session work hangs off events; offline work is an external cron calling a tool.
 - **Ship blank.** No preloaded personal data. What it learns stays on your machine and is never packaged.
 - **Mechanisms over model smarts.** Safety comes from deterministic rules, so swapping models changes quality, never safety.
+
+---
+
+## What's new in v0.6.2 — The guards get judged by behaviour, not by wording
+
+v0.6.2 is a patch release: no new features, no retrieval behaviour change. It acts
+on an external review of v0.6.1 that attacked the *guards* added in that release and
+got past two of them.
+
+- **All fsync logic now lives in one module.** Four copies existed, and two of them
+  were missing `ENOTSUP` from the soft-fail list, so the same unsyncable filesystem
+  made the transaction layer throw while the proposal layer shrugged. `lib/fsync.js`
+  is now the only place a path is opened in order to be flushed, and a test refuses
+  any other module doing it — discovered by scanning `lib/`, never a hand-written
+  list, because a hand-written list left a brand-new module with the identical bug
+  completely unread.
+- **The guard no longer trusts variable names.** It used to decide "is this a file
+  or a directory?" by regex-matching the identifier, so renaming a parameter to
+  `dir` while reverting `'r+'` to `'r'` restored the original Windows bug with every
+  test still green. The rule is now checked at the call site, and separately proved
+  at runtime: on a read-only file `'r+'` cannot be opened at all, so a helper that
+  had slipped back to `'r'` reports success where the real one reports refusal.
+- **A failed flush can no longer be published as a success.** `fsyncTree` returns
+  which files refused, and all three publish protocols check it before writing the
+  commit marker. The marker's entire meaning is "these bytes are on disk"; writing
+  it after a refused flush is a lie that recovery later trusts. On Windows this is
+  observable rather than silent for the first time.
+- **Governance limits are adjustable while running.** `store.js` copied the config
+  object at construction, so lowering `maxPendingQueue` from 50 to 10 in the
+  settings page returned 200, `/state` showed 10, and the flood defence kept
+  admitting 50 until the process restarted. The store now holds the host's own
+  object. Reported by two consecutive reviews before it was fixed.
+- **A misleading comment and two flattering assertions are corrected.**
+  `lib/search.js` claimed unrelated records "score exactly 0 — a wide safety gap".
+  They score 1.41. The two `smoke.mjs` precision assertions that appeared to guard
+  that gap pass only because their fixture happens to omit the shared 2-gram, and
+  now say so and point at the failing `test.todo` that records the real state.
+- **The gates' Python dependencies are declared in the repository.** They existed
+  only inside the CI workflow, so `test:contracts` on a fresh clone died with
+  `ModuleNotFoundError` — and the reason `rfc3339-validator` is load-bearing rather
+  than optional was knowledge trapped in a yml file. Now
+  `scripts/schema/requirements.txt`, which CI installs from, so the pins cannot
+  drift apart.
+- **`files` no longer declares a directory that does not exist** (`assets`).
+
+Six mutations were run against the rewritten guards, including the two the review
+used to defeat them; every one turns a guard red.
 
 ---
 
