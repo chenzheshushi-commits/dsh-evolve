@@ -13,7 +13,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, chmodSync,
+  mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -163,17 +163,22 @@ test('a rewrite whose backup fails changes nothing at all', async () => {
   try {
     seed(e, 'beta');
     const before = readFileSync(join(e.skillsDir, 'beta', 'SKILL.md'), 'utf8');
-    // Make the backup root unwritable: backupSkill must throw, and a rewrite
-    // without a way back must not proceed.
+    // Make the backup root unusable so backupSkill throws: a rewrite with no way
+    // back must not proceed.
+    //
+    // This used to be `chmodSync(root, 0o500)`, which does nothing to a DIRECTORY
+    // on Windows -- the backup then succeeded, the rewrite went ahead, and the
+    // assertion below failed on a platform where the safety property was never
+    // tested. Occupying the path with a FILE makes the mkdirSync inside
+    // backupSkill fail identically everywhere (ENOTDIR/EEXIST).
     const backupRoot = join(e.workspaceDir, '.curator-backups');
-    mkdirSync(backupRoot, { recursive: true });
-    chmodSync(backupRoot, 0o500);
+    writeFileSync(backupRoot, 'not a directory\n');
     const opId = e.ops.rt.newOpId('apply');
     const out = await e.ops.rewriteSkill({
       opId, source: 'autonomous-tool', action: 'refine', name: 'beta', tag: 'beta',
       records: evidence('beta-new'), receiptClaims: [{ receiptId: 'r1', skillName: 'beta', callId: 'c1', state: 'claimed' }],
     });
-    chmodSync(backupRoot, 0o700);
+    rmSync(backupRoot, { force: true });
     assert.equal(out.ok, false);
     assert.equal(readFileSync(join(e.skillsDir, 'beta', 'SKILL.md'), 'utf8'), before,
       'no backup means no rewrite');

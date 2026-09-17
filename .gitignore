@@ -22,3 +22,8 @@ __pycache__/
 
 # Packed tarballs from `pnpm pack` -- build output, not source
 *.tgz
+# ...but test fixtures are SOURCE. scripts/schema/fixtures/symlink-escape.tgz is a
+# prebuilt malicious archive: it cannot be generated at test time because Windows
+# refuses to create a symlink without elevation. A blanket *.tgz silently excluded
+# it and a commit claiming to add it added nothing.
+!scripts/schema/fixtures/*.tgz

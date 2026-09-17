@@ -15,6 +15,7 @@ import {
   mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, statSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
@@ -426,12 +427,16 @@ test('a malicious rollback artifact is refused before anything is written', () =
     assert.equal(inspect.ok, false);
     assert.match(inspect.reason, /exactly one root/);
 
-    const linkRoot = join(e.workspaceDir, 'linky');
-    mkdirSync(join(linkRoot, 'demo'), { recursive: true });
-    writeFileSync(join(linkRoot, 'demo', 'SKILL.md'), '# ok\n');
-    execFileSync('ln', ['-s', '/etc/passwd', join(linkRoot, 'demo', 'escape')]);
-    const linkTgz = join(e.workspaceDir, 'linky.tgz');
-    execFileSync('tar', ['-C', linkRoot, '-czf', linkTgz, 'demo']);
+    // The symlink case uses a COMMITTED fixture instead of building one here.
+    // Creating a symlink on Windows needs elevation (symlinkSync -> EPERM) and a
+    // junction cannot even be archived ("tar: Cannot stat: Invalid argument"), so
+    // building it at runtime made this security assertion Linux-only -- the one
+    // platform where an escaping tarball is least likely to arrive by surprise.
+    // inspectTarball only parses `tar -tvf` output, so a prebuilt archive
+    // exercises exactly the same code path on every OS.
+    // fileURLToPath, not .pathname: on Windows .pathname yields "/C:/..." which is
+    // not a usable path and tar cannot open it.
+    const linkTgz = fileURLToPath(new URL('./fixtures/symlink-escape.tgz', import.meta.url));
     const linkInspect = inspectTarball(linkTgz, { expectRoot: 'demo' });
     assert.equal(linkInspect.ok, false);
     assert.match(linkInspect.reason, /link/);

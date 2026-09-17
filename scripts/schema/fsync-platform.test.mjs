@@ -18,6 +18,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
 import { readFileSync, readdirSync, mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -122,5 +124,27 @@ test('every scripts/schema/*.test.mjs is wired into the test scripts', () => {
     for (const f of files) {
       assert.ok(pkg.scripts[key].includes(f), `package.json scripts.${key} never runs ${f}`);
     }
+  }
+});
+
+
+/**
+ * A fixture that tests read but git ignores is worse than a missing fixture: the
+ * suite is green locally, the commit says the fixture was added, and CI fails on a
+ * fresh clone. This repo's blanket `*.tgz` (aimed at pack output) swallowed
+ * scripts/schema/fixtures/symlink-escape.tgz exactly that way.
+ */
+test('every test fixture on disk is actually tracked by git', () => {
+  const dir = new URL('./fixtures/', import.meta.url);
+  let names;
+  try { names = readdirSync(dir); } catch { return; }   // no fixtures yet is fine
+  assert.ok(names.length > 0, 'the fixtures directory exists but is empty');
+  const repo = fileURLToPath(new URL('../../', import.meta.url));
+  for (const name of names) {
+    const rel = `scripts/schema/fixtures/${name}`;
+    const out = spawnSync('git', ['ls-files', '--error-unmatch', rel], { cwd: repo, encoding: 'utf8' });
+    assert.equal(out.status, 0,
+      `${rel} exists on disk but git does not track it -- check .gitignore, `
+      + 'a fresh clone would not have it');
   }
 });

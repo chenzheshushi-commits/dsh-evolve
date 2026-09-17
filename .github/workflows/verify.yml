@@ -34,6 +34,18 @@ jobs:
       - run: corepack enable
       - run: pnpm install --frozen-lockfile
 
+      # test:contracts runs the Python reference validators. jsonschema alone is not
+      # enough: without rfc3339-validator its date-time format check silently
+      # becomes a no-op, and the schema gate reports PASS while enforcing nothing.
+      # That is exactly the false-green this gate was written to prevent, so the
+      # optional extra is a hard requirement here.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check "jsonschema[format]==4.23.0" rfc3339-validator==0.1.4
+      - name: date-time format checking is actually live
+        run: python -c "from jsonschema import Draft202012Validator as V; p=V({'type':'string','format':'date-time'}, format_checker=V.FORMAT_CHECKER); assert not p.is_valid('not-a-date'), 'format checker is a no-op'; print('date-time format enforced')"
+
       - run: pnpm run typecheck
       - run: pnpm run build
 
