@@ -161,21 +161,28 @@ test('POST set-config reaches the live store (end to end)', async () => {
     const mod = await import('../../lib/index.js');
     await mod.apply(ctx, { maxPendingQueue: 50, disposalMinIdleDays: 30 });
 
-    const action = routes.find((r) => r.path === '/api/evolve/action');
-    assert.ok(action, 'the plugin must register /api/evolve/action (the settings page posts here)');
+    const routeFor = (path) => {
+      const r = routes.find((x) => x.path === path);
+      assert.ok(r, `the plugin must register ${path}`);
+      return r;
+    };
+    const action = routeFor('/api/evolve/action');
+    const state = routeFor('/api/evolve/state');
 
-    // Same shape as webroutes-e2e.mjs: a loopback request with a JSON body.
-    const post = async (body) => {
+    // Same shape as webroutes-e2e.mjs: a loopback request, JSON body for POST.
+    const call = async (route, body) => {
       const req = {
-        method: 'POST',
+        method: body === undefined ? 'GET' : 'POST',
         headers: {
           host: '127.0.0.1:3080', 'sec-fetch-site': 'same-origin',
           'content-type': 'application/json',
         },
         socket: { remoteAddress: '127.0.0.1' },
-        url: '/api/evolve/action',
+        url: route.path,
       };
-      req[Symbol.asyncIterator] = async function* () { yield Buffer.from(JSON.stringify(body)); };
+      req[Symbol.asyncIterator] = async function* () {
+        if (body !== undefined) yield Buffer.from(JSON.stringify(body));
+      };
       let status = 0;
       let payload = null;
       const res = {
@@ -183,19 +190,27 @@ test('POST set-config reaches the live store (end to end)', async () => {
         writeHead(s) { status = s; return res; },
         end(b) { try { payload = JSON.parse(String(b)); } catch { payload = String(b); } },
       };
-      await action.handler(req, res);
+      await route.handler(req, res);
       return { status, payload };
     };
+    const post = (body) => call(action, body);
 
     const before = await post({ action: 'set-config', maxPendingQueue: 10 });
     assert.equal(before.status, 200,
       `set-config must succeed (got ${before.status}: ${JSON.stringify(before.payload)})`);
 
-    // The whole point: the STORE, not just the returned view, must have moved.
-    const store = openedDomains.get('evolve_memory');
-    assert.ok(store, 'the evolve_memory domain must have been opened');
+    assert.ok(openedDomains.has('evolve_memory'), 'the memory domain must be open');
     assert.equal(before.payload?.config?.maxPendingQueue, 10,
       'the route must report the new value');
+
+    // The point of this test is the STORE, not the echoed response. /state renders
+    // its view from the same object the store holds, so a snapshotting store shows
+    // the stale limit here even though the POST above answered 200.
+    const view = await call(state);
+    assert.equal(view.status, 200, `/state must answer (got ${view.status})`);
+    assert.equal(view.payload?.config?.maxPendingQueue, 10,
+      'the write reached the route but not the live config: the settings page would '
+      + 'report success while the flood defence kept its old limit until restart');
 
     const second = await post({ action: 'set-config', disposalMinIdleDays: 1 });
     assert.equal(second.status, 200, 'a second write must also succeed');
