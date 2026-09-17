@@ -39,7 +39,7 @@ dsh plugin --profile web add github:chenzheshushi-commits/dsh-evolve
 Pin a specific release instead of tracking `main`:
 
 ```bash
-dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.6.2/dsh-evolve-0.6.2.tgz"
+dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.6.3/dsh-evolve-0.6.3.tgz"
 ```
 
 Then restart the harness — tools are discovered at startup, not hot-reloaded.
@@ -188,6 +188,53 @@ behavior on failure. Nothing runs in your main loop.
 
 ---
 
+## What's new in v0.6.3 — Finishing what v0.6.2 claimed, and undoing one regression
+
+v0.6.3 is a patch release. It acts on a review of v0.6.2 that found the previous
+release had **shipped a claim that was not true**, and had introduced one regression.
+
+- **The last path-level fsync is gone, and the gate can now see it.** v0.6.2 said
+  `lib/fsync.js` was "the only place a path is opened in order to be flushed, and a
+  test refuses any other module doing it". `lib/skills.js` still had one, on the
+  skill-writing path. The gate's regex used `[^)]*?`, which cannot cross a nested
+  call, so `openSync(dirname(file), 'r')` read as compliant — hoisting that argument
+  into a local variable, changing nothing else, made the same gate go red. Argument
+  splitting is now bracket-balanced, and a test feeds it four spellings including
+  two levels of nesting. That line was also the only fsync in the tree that
+  swallowed every error, including a real ENOSPC.
+- **A read-only file no longer fails a publish.** v0.6.2 refused to publish whenever
+  any file declined to flush, so one `0444` file inside a skill tree broke
+  crystallize / refine / rollback outright. That conflated two different events: a
+  platform that does not support this kind of fsync, and a file that is read-only.
+  Neither means the bytes are missing — the data is written and closed before the
+  flush is attempted, and the marker's load-bearing property is that it is written
+  *last*, not that every fsync succeeded. `fsyncFile` now reports *which* kind of
+  refusal happened, and a degraded publish is recorded on the marker
+  (`durability: 'partial'` plus the file list) and logged, instead of aborting.
+- **The runtime proof runs on Windows now.** The one assertion that proves `'r+'`
+  without reading source text was skipped on win32 with the comment "Windows ignores
+  chmod on the write bit". That is false — measured on Windows 11 / node 22.22.3,
+  `chmod 0o444` maps to `FILE_ATTRIBUTE_READONLY` and `openSync('r+')` fails with
+  EPERM. It now probes whether the filesystem enforces the bit and skips only when it
+  genuinely does not (root, FAT/exFAT).
+- **The retrieval measurements were the wrong quantity.** The floor is compared
+  against `base` (search.js:236); the numbers quoted in v0.6.1/v0.6.2 (1.41, 1.47,
+  3.07) were *return* scores, after three multipliers. Re-derived as `base`: the real
+  hit is **0.8393**, the near-tie false positive **0.8065** (so that pair *is*
+  separable, contrary to the old claim), and the unrelated record **1.7541** — more
+  than double the real hit. That last one is why no floor can fix this, and it is now
+  what the ratchet asserts. Previously the ratchet went red on "the real hit was
+  killed", which a floor change triggers while leaving the hole wide open.
+- **Config wiring is asserted, not just its mechanism.** The store holding a live
+  object was tested; that the host hands it the same object every write path mutates
+  was only confirmed by reading three lines of `index.js`. Now asserted.
+- **`injectionCount` has one definition again.** The budget tie-break read the
+  persisted field while the rest of the store used the effective count.
+
+Retrieval precision itself is unchanged and still tracked as issue #2.
+
+---
+
 ## What's new in v0.6.2 — The guards get judged by behaviour, not by wording
 
 v0.6.2 is a patch release: no new features, no retrieval behaviour change. It acts
@@ -200,7 +247,8 @@ got past two of them.
   is now the only place a path is opened in order to be flushed, and a test refuses
   any other module doing it — discovered by scanning `lib/`, never a hand-written
   list, because a hand-written list left a brand-new module with the identical bug
-  completely unread.
+  completely unread. (v0.6.2 shipped this claim while `lib/skills.js` still held one
+  such fsync that the gate's regex could not see; fixed in v0.6.3.)
 - **The guard no longer trusts variable names.** It used to decide "is this a file
   or a directory?" by regex-matching the identifier, so renaming a parameter to
   `dir` while reverting `'r+'` to `'r'` restored the original Windows bug with every
@@ -454,8 +502,6 @@ v0.4.0/v0.4.1 gave you the evolution loop (tiered approval, reinforcement, anti-
 A2 layout in the settings page: **approval queue** (existing) at top, then the new **controlled-prune** block (candidates + preview/execute + protected area + forgotten list), then **overview** below. Pinned rows render their checkbox disabled.
 
 Excluded by design: local vector models, semantic search, knowledge graphs (too heavy for an optimization, not a rewrite). All four pure-logic mechanisms adopted — heat, JSONL audit, two-stage preview→execute with registry, idle refresh — were chosen because they add **zero new dependencies** and respect the "detect automatically, dispose explicitly" principle. The community is `chenzheshushi-commits/dsh-evolve` on GitHub; issue reports welcome.
-
----
 
 ---
 

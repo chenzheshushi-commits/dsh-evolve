@@ -18,7 +18,10 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { readFileSync, readdirSync, mkdtempSync, rmSync, existsSync, chmodSync } from 'node:fs';
+import {
+  readFileSync, readdirSync, mkdtempSync, rmSync, existsSync, chmodSync,
+  writeFileSync, openSync, closeSync,
+} from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
@@ -40,21 +43,72 @@ const read = (f) => readFileSync(`${libDir}${f}`, 'utf8');
  *
  * Discovered by scanning, never hand-listed: a hand-written module list left a
  * brand-new module with the identical bug completely unread.
+ *
+ * Arguments are split by BRACKET BALANCE, not by regex. The v0.6.2 version used
+ * /openSync\([^)]*?,\s*'r\+?'\s*\)/, whose `[^)]` cannot cross a nested call, so
+ * `openSync(dirname(file), 'r')` in lib/skills.js was invisible -- the one real
+ * offender in the tree. Hoisting that argument into a local variable, changing
+ * nothing about the behaviour, made the same gate go red. A judgement that depends
+ * on how an expression is spelled is the same defect as judging by variable name,
+ * one level up.
  */
+function splitCallArgs(text, openIdx) {
+  // openIdx points just past the '(' of the call. Returns the top-level arguments.
+  let depth = 1;
+  let i = openIdx;
+  const args = [];
+  let cur = '';
+  let quote = null;
+  while (i < text.length && depth > 0) {
+    const ch = text[i];
+    if (quote) {
+      cur += ch;
+      if (ch === quote && text[i - 1] !== '\\') quote = null;
+    } else if (ch === '\'' || ch === '"' || ch === '`') {
+      quote = ch; cur += ch;
+    } else if ('([{'.includes(ch)) {
+      depth += 1; cur += ch;
+    } else if (')]}'.includes(ch)) {
+      depth -= 1;
+      if (depth === 0) break;
+      cur += ch;
+    } else if (ch === ',' && depth === 1) {
+      args.push(cur.trim()); cur = '';
+    } else {
+      cur += ch;
+    }
+    i += 1;
+  }
+  args.push(cur.trim());
+  return { args, end: i };
+}
+
+/** Every openSync(<path>, 'r'|'r+') whose handle is then fsynced. */
+function pathLevelFsyncs(text) {
+  const hits = [];
+  for (const m of text.matchAll(/openSync\(/g)) {
+    const { args, end } = splitCallArgs(text, m.index + m[0].length);
+    if (args.length < 2) continue;
+    const mode = args[1].trim();
+    // Only read modes matter: a handle already open for writing carries its mode
+    // at the call site and is a different, legitimate pattern.
+    if (mode !== "'r'" && mode !== "'r+'") continue;
+    const after = text.slice(end, end + 400);
+    if (!/fsyncSync\s*\(/.test(after)) continue;
+    hits.push({ line: text.slice(0, m.index).split('\n').length, arg: args[0], mode });
+  }
+  return hits;
+}
+
 function pathLevelFsyncModules() {
   const all = readdirSync(libDir).filter((f) => f.endsWith('.js') && f !== 'fsync.js');
   const offenders = [];
   for (const f of all) {
-    const text = read(f);
-    // openSync(<path>, 'r' | 'r+') followed by an fsyncSync in the same vicinity:
-    // a handle opened purely in order to flush it. Handles already open for
-    // writing ('w'/'wx'/'a') are a different pattern and stay put.
-    for (const m of text.matchAll(/openSync\([^)]*?,\s*'r\+?'\s*\)/g)) {
-      const after = text.slice(m.index, m.index + 400);
-      if (/fsyncSync\s*\(/.test(after)) { offenders.push(f); break; }
+    for (const hit of pathLevelFsyncs(read(f))) {
+      offenders.push(`${f}:${hit.line} openSync(${hit.arg}, ${hit.mode})`);
     }
   }
-  return [...new Set(offenders)];
+  return offenders;
 }
 
 test('no module outside lib/fsync.js opens a path just to fsync it', () => {
@@ -62,7 +116,31 @@ test('no module outside lib/fsync.js opens a path just to fsync it', () => {
   assert.deepEqual(offenders, [],
     'these modules open a path themselves in order to fsync it instead of calling '
     + 'the shared helpers, and such a copy drifts from the platform rules exactly '
-    + `as the four v0.6.1 copies did: ${offenders.join(', ')}`);
+    + `as the four v0.6.1 copies did:\n  ${offenders.join('\n  ')}`);
+});
+
+/**
+ * The scan must survive the spelling that defeated the previous one. Without this,
+ * a future "simplification" back to a regex would silently restore the blind spot.
+ */
+test('the path-level scan sees through a nested call in the argument', () => {
+  const spellings = [
+    "const fd = openSync(p, 'r'); fsyncSync(fd);",
+    "const fd = openSync(dirname(file), 'r'); fsyncSync(fd);",
+    "const fd = openSync(join(a, b), 'r+'); fsyncSync(fd);",
+    "const fd = openSync(resolve(dirname(x), '..'), 'r'); fsyncSync(fd);",
+  ];
+  for (const src of spellings) {
+    assert.equal(pathLevelFsyncs(src).length, 1,
+      `the scan missed a path-level fsync written as: ${src}`);
+  }
+  // And it must NOT flag a handle already opened for writing.
+  for (const ok of ["const fd = openSync(tmp, 'w'); fsyncSync(fd);",
+                    "const fd = openSync(p, 'wx'); fsyncSync(fd);",
+                    "const fd = openSync(logPath, 'a', 0o600); fsyncSync(fd);"]) {
+    assert.equal(pathLevelFsyncs(ok).length, 0,
+      `the scan wrongly flagged a write-mode handle: ${ok}`);
+  }
 });
 
 /** ...and the shared module must genuinely be the one doing it. */
@@ -87,11 +165,11 @@ test('no fsync reaches a regular file through an O_RDONLY handle', () => {
   // wrappers, not by guessing from identifiers.
   const dirFn = text.slice(text.indexOf('export function fsyncDir'));
   const fileFn = text.slice(text.indexOf('export function fsyncFile'));
-  assert.match(dirFn.slice(0, 200), /flush\([^,]+,\s*'r'\)/,
+  assert.match(dirFn.slice(0, 300), /flush\([^,]+,\s*'r'\s*,/,
     'fsyncDir is expected to open a directory read-only (soft-failed everywhere)');
-  assert.match(fileFn.slice(0, 200), /flush\([^,]+,\s*'r\+'\)/,
+  assert.match(fileFn.slice(0, 300), /flush\([^,]+,\s*'r\+'\s*,/,
     "fsyncFile must open 'r+': 'r' is refused by Windows and 'w' truncates the file");
-  assert.equal(/flush\([^,]+,\s*'w'\)/.test(text), false,
+  assert.equal(/flush\([^,]+,\s*'w'/.test(text), false,
     "'w' truncates -- it must never be used to fsync an existing file");
 });
 
@@ -121,8 +199,15 @@ test('both fsync helpers report whether the flush happened', () => {
       `${name} must return the flush result; a caller that cannot tell success from `
       + 'a platform refusal will publish a durability claim it cannot back');
   }
-  assert.match(text, /return\s+true;/, 'flush must report success');
-  assert.match(text, /return\s+false;/, 'flush must report a soft refusal');
+  assert.match(text, /outcome:\s*FSYNC_FLUSHED/, 'flush must report success');
+  assert.match(text, /ok:\s*false/, 'flush must report a soft refusal');
+  // The two refusal kinds must stay distinguishable. Collapsing them is what made a
+  // single read-only file abort an entire publish in v0.6.2.
+  for (const k of ['FSYNC_UNSUPPORTED', 'FSYNC_NOT_WRITABLE']) {
+    assert.ok(text.includes(`export const ${k}`), `lib/fsync.js must export ${k}`);
+  }
+  assert.match(text, /NOT_WRITABLE\s*=\s*Object\.freeze/,
+    'the "this object is read-only" codes must be a named list, not inline literals');
   // A refusal is reported ONLY for the known platform codes. Reporting false for
   // everything turns a real I/O error (ENOSPC, EIO) into "the platform declined",
   // which is how a genuinely failed write gets treated as an acceptable outcome.
@@ -139,35 +224,38 @@ test('both fsync helpers report whether the flush happened', () => {
  * it before writing a marker. The marker's whole meaning is "these bytes are on
  * disk"; writing it after a failed flush is the lie that recovery later trusts.
  */
-test('a tree whose files could not be flushed never gets a marker', () => {
+test('a refused flush is recorded on the marker, not turned into a failure', () => {
   const runtime = read('op-runtime.js');
   const tree = runtime.slice(runtime.indexOf('export function fsyncTree'));
-  assert.match(tree, /unsynced/,
-    'fsyncTree must track which files refused to flush');
-  assert.match(tree, /return\s*\{\s*ok:/,
-    'fsyncTree must return a verdict, not undefined');
-  // The verdict has to come from the helper's RESULT. Calling fsyncFile and
-  // discarding what it says is precisely the v0.6.0 bug: the refusal existed, the
-  // caller never looked, and the marker went out anyway.
-  assert.match(tree, /!\s*fsyncFile\(|fsyncFile\([^)]*\)\s*===\s*false|const\s+\w+\s*=\s*fsyncFile\(/,
-    'fsyncTree must branch on fsyncFile\'s return value; ignoring it makes the '
-    + 'unsynced list permanently empty and ok permanently true');
+  // fsyncTree must still branch on the helper's RESULT -- discarding it is the
+  // v0.6.0 bug where every refusal was invisible.
+  assert.match(tree, /const\s+\w+\s*=\s*fsyncFile\(/,
+    'fsyncTree must capture fsyncFile\'s result; ignoring it makes every refusal invisible');
+  assert.match(tree, /FSYNC_NOT_WRITABLE/,
+    'fsyncTree must separate a read-only file from an unsupported platform');
+  assert.match(tree, /unsynced/, 'fsyncTree must report which files were not flushed');
+  assert.match(tree, /unsupported/, 'fsyncTree must report platform refusals separately');
 
   const protocols = read('publish-protocols.js');
   const calls = [...protocols.matchAll(/fsyncTree\(/g)];
   assert.ok(calls.length >= 3, `every publish path must fsync its tree (found ${calls.length})`);
-  const guards = [...protocols.matchAll(/if\s*\(!\s*synced\.ok\s*\)/g)];
-  assert.equal(guards.length, calls.length,
-    `every fsyncTree call must be followed by a refusal check before writeMarker `
-    + `(${calls.length} calls, ${guards.length} guards)`);
-  // And the guard must come BEFORE the marker in each protocol body.
-  for (const m of protocols.matchAll(/const synced = fsyncTree\([^)]*\);/g)) {
-    const after = protocols.slice(m.index, m.index + 700);
-    const guardAt = after.search(/if\s*\(!\s*synced\.ok\s*\)/);
-    const markerAt = after.search(/writeMarker\(/);
-    assert.ok(guardAt >= 0 && markerAt >= 0 && guardAt < markerAt,
-      'the refusal check must precede writeMarker, or the marker is published anyway');
-  }
+
+  // Every marker write must go through the stamping helper, so a degraded publish
+  // is always recorded. A plain writeMarker(dir, marker) would publish silently.
+  const bare = [...protocols.matchAll(/writeMarker\(\s*\w+\s*,\s*marker\s*\)/g)];
+  assert.deepEqual(bare.map((m) => m[0]), [],
+    'a marker written without the durability stamp hides a degraded publish: '
+    + `${bare.map((m) => m[0]).join(', ')}`);
+  const stamped = [...protocols.matchAll(/writeMarker\([^)]*durabilityMarker\(/g)];
+  assert.equal(stamped.length, calls.length,
+    `each of the ${calls.length} publish paths must stamp its marker (found ${stamped.length})`);
+
+  // And a read-only file must NOT abort the publish -- that regression made one
+  // 0444 file fail every crystallize/refine/rollback.
+  assert.equal(/refusing to publish a durability marker/.test(protocols), false,
+    'aborting on a refused flush is the v0.6.2 regression: the bytes were written '
+    + 'and closed before the flush was attempted, so a read-only file is not '
+    + 'evidence of data loss');
 });
 
 /** A real round trip through the proposal pipeline. */
@@ -190,31 +278,56 @@ test('ProposalStore survives a full create/read/update/claim round trip', async 
 });
 
 /**
- * Runtime proof that fsyncFile actually opens a WRITE-capable handle, closing the
- * gap the review found: on a read-only file, 'r+' cannot be opened at all, so the
- * helper must report a refusal. A helper that had reverted to 'r' would open the
- * handle happily and -- on Linux -- return true.
+ * Runtime proof that fsyncFile opens a WRITE-capable handle: on a read-only file
+ * 'r+' cannot be opened at all, so the helper must report a refusal, while a helper
+ * that had slipped back to 'r' would open it happily and return true. This is the
+ * ONLY evidence for that requirement that does not read source text, and F1 showed
+ * source-text evidence can be sidestepped by respelling.
  *
- * POSIX-only: Windows ignores chmod on the write bit for files owned by the user,
- * and root ignores it everywhere.
+ * v0.6.2 skipped it on win32 with the comment "Windows ignores chmod on the write
+ * bit". That is FALSE -- measured on Windows 11 / node 22.22.3, chmod 0o444 maps to
+ * FILE_ATTRIBUTE_READONLY and openSync('r+') fails with EPERM. The one platform this
+ * whole patch series is about was the one platform the proof was disabled on.
+ *
+ * So probe instead of guessing: make a file read-only, try to open it for writing,
+ * and only skip when the filesystem genuinely ignored us (root, FAT/exFAT, some
+ * network mounts).
  */
-test('fsyncFile needs a write-capable handle (runtime, POSIX)', async (t) => {
-  if (process.platform === 'win32' || (process.getuid && process.getuid() === 0)) {
-    t.skip('chmod-based read-only files are not enforced here');
-    return;
+function readOnlyIsEnforced(dir) {
+  const probe = join(dir, '.ro-probe');
+  writeFileSync(probe, 'x');
+  chmodSync(probe, 0o444);
+  try {
+    closeSync(openSync(probe, 'r+'));
+    return false;                              // opened for writing anyway
+  } catch {
+    return true;
+  } finally {
+    try { chmodSync(probe, 0o644); } catch { /* best effort */ }
+    try { rmSync(probe, { force: true }); } catch { /* best effort */ }
   }
+}
+
+test('fsyncFile needs a write-capable handle (runtime)', async (t) => {
   const { fsyncFile } = await import('../../lib/fsync.js');
   const root = mkdtempSync(join(tmpdir(), 'dsh-evolve-ro-'));
   try {
+    if (!readOnlyIsEnforced(root)) {
+      t.skip('this filesystem does not enforce the read-only bit (root, or FAT/exFAT)');
+      return;
+    }
     const f = join(root, 'locked.txt');
-    readFileSync;                              // keep the import list honest
-    const { writeFileSync } = await import('node:fs');
     writeFileSync(f, 'x');
-    chmodSync(f, 0o400);                       // read-only: 'r+' must fail, 'r' would not
-    assert.equal(fsyncFile(f), false,
+    chmodSync(f, 0o444);                       // read-only: 'r+' must fail, 'r' would not
+    const r = fsyncFile(f);
+    assert.equal(r.ok, false,
       "fsyncFile reported success on a read-only file, which means it is not opening 'r+'");
+    // And it must say WHY. A bare false forced publish-protocols to treat a
+    // read-only file and an unsupported platform as the same event.
+    assert.equal(r.outcome, 'not-writable',
+      `a read-only FILE must report not-writable, got "${r.outcome}" (code ${r.code})`);
   } finally {
-    try { chmodSync(join(root, 'locked.txt'), 0o600); } catch { /* already gone */ }
+    try { chmodSync(join(root, 'locked.txt'), 0o644); } catch { /* already gone */ }
     rmSync(root, { recursive: true, force: true });
   }
 });

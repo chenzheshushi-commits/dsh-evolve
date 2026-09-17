@@ -106,3 +106,43 @@ test('the store does not copy the config object', () => {
   assert.match(ctor, /this\.config\s*=\s*live/,
     'the store must hold the host\'s own config object');
 });
+
+
+/**
+ * The mechanism test above proves the store keeps whatever object it is handed. It
+ * does NOT prove the host hands it the object the settings page writes to -- that
+ * wiring is three separate lines in index.js and was, until now, confirmed only by
+ * reading them:
+ *
+ *   :212   const cfg = { ...MEMORY_DEFAULTS, ...SKILL_DEFAULTS, ...config }
+ *   :279   new MemoryStore(table, { ..., config: cfg, ... })
+ *   :1798  setConfig:  Object.assign(cfg, patch)          (web route)
+ *   :2113  onChange:   Object.assign(cfg, current())      (dsh-settings)
+ *
+ * Point the store at a different object, or add a fourth write path that mutates
+ * the host's original `config` instead of `cfg`, and every behavioural test here
+ * still passes while the settings page goes back to having no effect.
+ */
+test('the store is wired to the same object every config write path mutates', () => {
+  const index = readFileSync(new URL('../../lib/index.js', import.meta.url), 'utf8');
+
+  // 1. What identifier does the store receive?
+  const ctor = /new MemoryStore\([\s\S]{0,400}?\)\s*;/.exec(index);
+  assert.ok(ctor, 'lib/index.js must construct MemoryStore');
+  const passed = /config:\s*([A-Za-z_$][\w$]*)/.exec(ctor[0]);
+  assert.ok(passed, 'MemoryStore must receive a named config object, not an inline literal: '
+    + 'an inline object cannot be mutated by setConfig and freezes every limit');
+  const target = passed[1];
+
+  // 2. Every Object.assign that writes config must target that same identifier.
+  const writes = [...index.matchAll(/Object\.assign\(\s*([A-Za-z_$][\w$]*)\s*,/g)]
+    .map((m) => m[1])
+    .filter((name) => name === target || /^(cfg|config)$/.test(name));
+  assert.ok(writes.length >= 2,
+    `expected the config write paths to be Object.assign calls (found ${writes.length})`);
+  for (const name of writes) {
+    assert.equal(name, target,
+      `a config write path mutates "${name}" but the store holds "${target}"; `
+      + 'the settings page would report success and change nothing');
+  }
+});
