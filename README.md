@@ -203,6 +203,23 @@ non-trivial write has a deterministic boundary and a recovery path.
   Pinned, importance-3, preference, decision, pending and rejected records are
   never automatic subjects. Soft-deleted records remain visible and restorable.
   **No tier physically deletes memory. Tombstone GC is not part of v0.6.0.**
+- **Durable operations with recovery.** Every skill mutation runs as a transaction
+  with a manifest, a write-ahead log and a single commit point, so an interruption
+  leaves a state the next start can finish rather than a half-written skill.
+  Publishing uses the protocol the change actually needs — a new directory is one
+  rename, a body rewrite commits the operation id inside the file it rewrites, a
+  rollback goes through a retired intermediate, and an archive is a pure move.
+  Cross-filesystem moves fail closed instead of degrading to copy-then-delete.
+- **An exit from stuck operations.** A conflict or a partially-completed merge is
+  frozen rather than guessed at, keeps its authorization so nothing else can touch
+  the same target, and appears in the settings page for a roll-forward or roll-back
+  decision. After the commit point nothing rolls back: a converge whose second
+  source could not be archived reports the partial state and keeps the live merge,
+  because "cleaning up" would destroy work that already succeeded.
+- **Archives addressed by id.** Several archives of one skill coexist, each with a
+  timestamped `archiveId`, and restore names the generation it wants. `skill_rollback`
+  now only ever creates a proposal, and pins the chosen backup by content hash at
+  proposal time so a later backup cannot change what comes back.
 - **Skill proposals.** In manual and balanced modes, crystallize/refine/fold/converge
   create a proposal instead of changing the live catalog. The settings page is the
   only apply/reject surface; model tools cannot approve their own work. Select an
@@ -220,7 +237,10 @@ non-trivial write has a deterministic boundary and a recovery path.
   patterns are blocked before memory, skill, mirror or Git persistence. Source
   context and audit fields are redacted; incidents store only hashes and masked
   snippets, never the original token. Ordinary prose about “password” or “token”
-  remains valid knowledge.
+  remains valid knowledge. Approving a quarantined finding binds to the exact
+  occurrences reviewed — including repeated copies — plus the scanner and
+  normalization versions, so a re-scan that finds more cannot be waved through by
+  an older approval.
 - **Objective background review.** Review requires substantial foreground work.
   Completed/interrupted turns qualify; error/blocked/aborted turns do not. State is
   isolated per session, and successful skill-tool use issues short-lived,
@@ -230,14 +250,21 @@ non-trivial write has a deterministic boundary and a recovery path.
   **not** cover background review: that runs after `turn/end`, where DSH forbids an
   approval request. Background suggestions continue to use the settings review
   queue. The popup is off by default and limited to one per turn by default.
-- **Web replay protection.** Proposal apply/reject uses short-lived, same-origin,
+  Cancelling or dismissing leaves the memory pending — an unanswered prompt is not
+  consent — and declining reports the memory as rejected rather than saved.
+- **Web replay protection.** Privileged Web actions use short-lived, same-origin,
   single-use capabilities. This is CSRF/replay protection and an audit anchor; it
-  is not presented as proof that a human clicked.
+  is not presented as proof that a human clicked. Retrying the same operation id
+  replays its receipt instead of being refused, so a client that lost its response
+  is never pushed into publishing the same change twice.
 
 Operational boundaries:
 
-- Multiple processes sharing one evolve workspace are unsupported; use one DSH
-  instance per workspace.
+- Two processes may point at one evolve workspace without corrupting it: the first
+  takes an instance lock and the second degrades to read-only for automatic work —
+  tidy lists candidates instead of deleting them, and pruning refuses. A lock left
+  by a crashed process is reclaimed as soon as that process is gone, not after a
+  timeout. Running one DSH instance per workspace is still the recommended setup.
 - There is an unavoidable, very small POSIX window between the final stale check
   and atomic rename. Do not hand-edit the same skill while an apply is in flight.
 - The plugin still ships blank; no memory, proposal, incident or owner id is in the
