@@ -128,6 +128,7 @@ test('POST set-config reaches the live store (end to end)', async () => {
   process.env.USERPROFILE = home;
   try {
     const openedDomains = new Map();
+    const registeredTools = new Map();
     const routes = [];
     const ctx = {
       logger: { info() {}, warn() {}, error() {} },
@@ -143,7 +144,10 @@ test('POST set-config reaches the live store (end to end)', async () => {
           return d;
         },
       },
-      tools: { register() {}, get: () => undefined },
+      tools: {
+        register(t) { registeredTools.set(t.name, t); },
+        get: (n) => registeredTools.get(n),
+      },
       systemPrompt: { section() {}, context() {}, variable() {} },
       on: () => {},
       effect: () => {},
@@ -159,7 +163,10 @@ test('POST set-config reaches the live store (end to end)', async () => {
     };
 
     const mod = await import('../../lib/index.js');
-    await mod.apply(ctx, { maxPendingQueue: 50, disposalMinIdleDays: 30 });
+    // apply()'s second argument IS the config object the whole plugin shares:
+    // getConfig returns it, setConfig mutates it, MemoryStore is meant to hold it.
+    const hostConfig = { maxPendingQueue: 50, disposalMinIdleDays: 30 };
+    await mod.apply(ctx, hostConfig);
 
     const routeFor = (path) => {
       const r = routes.find((x) => x.path === path);
@@ -203,14 +210,14 @@ test('POST set-config reaches the live store (end to end)', async () => {
     assert.equal(before.payload?.config?.maxPendingQueue, 10,
       'the route must report the new value');
 
-    // The point of this test is the STORE, not the echoed response. /state renders
-    // its view from the same object the store holds, so a snapshotting store shows
-    // the stale limit here even though the POST above answered 200.
+    // Both /state and the POST reply render from readConfigView(getConfig()) --
+    // the SAME object setConfig writes. Asserting on either only proves the route
+    // echoes its own patch, so a store holding a snapshot passes both. Ask the STORE.
     const view = await call(state);
     assert.equal(view.status, 200, `/state must answer (got ${view.status})`);
-    assert.equal(view.payload?.config?.maxPendingQueue, 10,
-      'the write reached the route but not the live config: the settings page would '
-      + 'report success while the flood defence kept its old limit until restart');
+    assert.equal(view.payload?.config?.maxPendingQueue, 10, 'the route view must move');
+
+
 
     const second = await post({ action: 'set-config', disposalMinIdleDays: 1 });
     assert.equal(second.status, 200, 'a second write must also succeed');
@@ -221,6 +228,35 @@ test('POST set-config reaches the live store (end to end)', async () => {
     assert.equal(second.payload?.config?.maxPendingQueue, 10,
       'the earlier change was lost: each write is landing on a fresh copy, which is '
       + 'exactly the snapshot bug one layer up');
+
+    // Now the part the route view cannot prove. store.remember() enforces the
+    // pending-queue cap by reading `this.config.maxPendingQueue` (store.js:399) and
+    // returns null once the queue is full. maxPendingQueue is now 1 (set above via
+    // the real route), so the SECOND pending write must be refused. A store holding
+    // a construction-time copy still believes the cap is 50 and accepts it.
+    // Drop the cap to 1 through the same route, so the second write is over it.
+    const tighten = await post({ action: 'set-config', maxPendingQueue: 1 });
+    assert.equal(tighten.status, 200, `tightening the cap must succeed (got ${tighten.status})`);
+
+    const remember = registeredTools.get('memory_remember');
+    assert.ok(remember, 'the plugin must register memory_remember (the store-side probe)');
+    const write = (content) => remember.execute(
+      { content, kind: 'note', importance: 1, scope: 'project' },
+      { confirm: async () => false },
+    );
+
+    const first = await write('the office kettle lives on the third shelf by the window');
+    assert.equal(first?.saved, true, `the first write must land (got ${JSON.stringify(first)})`);
+    assert.equal(first?.status, 'pending', 'the probe write must be a PENDING item (the capped kind)');
+
+    // store.remember() returns null once the cap is reached; the tool reports that
+    // as { saved: false }.
+    const overflow = await write('quarterly freight invoices are reconciled every second Tuesday');
+    assert.equal(overflow?.saved, false,
+      'the store accepted a second pending item while maxPendingQueue was 1, so it is '
+      + 'not reading the config the route just changed: lib/index.js handed MemoryStore '
+      + 'its own copy. The settings page answers 200 and the flood defence keeps its '
+      + `old limit until restart. Got: ${JSON.stringify(overflow)}`);
   } finally {
     if (prevHome === undefined) delete process.env.HOME; else process.env.HOME = prevHome;
     if (prevProfile === undefined) delete process.env.USERPROFILE; else process.env.USERPROFILE = prevProfile;

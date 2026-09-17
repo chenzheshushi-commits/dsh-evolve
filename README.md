@@ -39,7 +39,7 @@ dsh plugin --profile web add github:chenzheshushi-commits/dsh-evolve
 Pin a specific release instead of tracking `main`:
 
 ```bash
-dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.6.4/dsh-evolve-0.6.4.tgz"
+dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.6.5/dsh-evolve-0.6.5.tgz"
 ```
 
 Then restart the harness — tools are discovered at startup, not hot-reloaded.
@@ -185,6 +185,47 @@ behavior on failure. Nothing runs in your main loop.
 - **No internal timers.** In-session work hangs off events; offline work is an external cron calling a tool.
 - **Ship blank.** No preloaded personal data. What it learns stays on your machine and is never packaged.
 - **Mechanisms over model smarts.** Safety comes from deterministic rules, so swapping models changes quality, never safety.
+
+---
+
+## What's new in v0.6.5 — The config guard now asks the store, not the route
+
+v0.6.5 is a patch release with **no production code changes**. It fixes one test that
+claimed more than it checked.
+
+A review of v0.6.4 reproduced every claim that release made (32 mutations, 27/27 red
+where expected; 8 quoted numbers plus 3 floors all recomputed) and then showed that
+the guard v0.6.4 was proudest of does not catch the defect it exists for:
+
+```
+lib/index.js:279   config: cfg  ->  config: { ...cfg }
+                   (the store gets a snapshot; the settings page silently stops working)
+
+  config-liveness.test.mjs   4/4 pass      <- missed it
+  all 326 contract tests     0 fail        <- missed it
+  all four e2e suites        pass          <- missed it
+```
+
+Both `/state` and the `set-config` reply render from `readConfigView(getConfig())` —
+the same object `setConfig` writes. Asserting on either only proves the route echoes
+its own patch. The mechanism test v0.6.4 deleted did catch this shape, so on that one
+axis v0.6.4 was a regression, and the release notes said the opposite.
+
+The store now answers for itself: the test tightens `maxPendingQueue` to 1 through the
+real route, then calls the registered `memory_remember` tool twice. `store.remember()`
+enforces that cap by reading `this.config.maxPendingQueue` (`store.js:399`) and
+returns null once the queue is full, so the second write must be refused. A store
+holding a construction-time copy still believes the cap is 50 and accepts it.
+
+Measured: the snapshot defect goes red, assigning onto a copy goes red, reverting the
+store to a constructor snapshot fails three assertions, and the equivalent refactor
+(per-key assignment instead of `Object.assign`) stays green.
+
+Known and tracked for the next release: `reconcile()` still projects `durability` away
+before it leaves `op-runtime.js`, and on Windows `fsyncTree` discards directory-level
+refusals so the field is never written at all; two guards still judge adjacency with
+fixed character windows and will fail correct code; the `publish-protocols.js` comment
+still says nothing reads a durability field.
 
 ---
 
