@@ -14,10 +14,6 @@
  * index.js:398 documents this trap for idleTrigger, which avoided it by reading
  * through predicates. The store had the same shape and no such protection, and two
  * consecutive external reviews reported it before it was fixed.
- *
- * Asserted behaviourally, through a real store over a fake table: a source-level
- * check ("does the constructor spread?") would pass the moment someone spread the
- * object somewhere else.
  */
 import { test } from 'node:test';
 import assert from 'node:assert';
@@ -107,42 +103,112 @@ test('the store does not copy the config object', () => {
     'the store must hold the host\'s own config object');
 });
 
-
 /**
- * The mechanism test above proves the store keeps whatever object it is handed. It
- * does NOT prove the host hands it the object the settings page writes to -- that
- * wiring is three separate lines in index.js and was, until now, confirmed only by
- * reading them:
+ * End-to-end: drive the REAL web route the settings page calls, then read the REAL
+ * store the plugin built.
  *
- *   :212   const cfg = { ...MEMORY_DEFAULTS, ...SKILL_DEFAULTS, ...config }
- *   :279   new MemoryStore(table, { ..., config: cfg, ... })
- *   :1798  setConfig:  Object.assign(cfg, patch)          (web route)
- *   :2113  onChange:   Object.assign(cfg, current())      (dsh-settings)
+ * The v0.6.3 version of this test matched /Object\.assign\(\s*(\w+)\s*,/ against
+ * index.js and compared identifiers. Two measured problems with that:
  *
- * Point the store at a different object, or add a fourth write path that mutates
- * the host's original `config` instead of `cfg`, and every behavioural test here
- * still passes while the settings page goes back to having no effect.
+ *   - it rejected `for (const [k,v] of Object.entries(patch)) cfg[k] = v`, a change
+ *     with byte-for-byte identical behaviour. A guard that fails correct refactors
+ *     teaches people to ignore red.
+ *   - it caught the real defect (assigning onto a copy) only as a side effect of a
+ *     `writes.length >= 2` count, not through the rule it claimed to enforce.
+ *
+ * Judging config wiring by the shape of an assignment expression is the same mistake
+ * the fsync gate made by judging a handle by its variable name. So this asserts the
+ * behaviour instead: POST the action the frontend posts, and check the store moved.
  */
-test('the store is wired to the same object every config write path mutates', () => {
-  const index = readFileSync(new URL('../../lib/index.js', import.meta.url), 'utf8');
+test('POST set-config reaches the live store (end to end)', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'dsh-evolve-e2e-'));
+  const prevHome = process.env.HOME;
+  const prevProfile = process.env.USERPROFILE;
+  process.env.HOME = home;
+  process.env.USERPROFILE = home;
+  try {
+    const openedDomains = new Map();
+    const routes = [];
+    const ctx = {
+      logger: { info() {}, warn() {}, error() {} },
+      storageDomain: {
+        get: (name) => openedDomains.get(name),
+        open: async (decl) => {
+          const tables = new Map();
+          const d = {
+            table(n) { if (!tables.has(n)) tables.set(n, fakeTable()); return tables.get(n); },
+            close() {},
+          };
+          openedDomains.set(decl.name, d);
+          return d;
+        },
+      },
+      tools: { register() {}, get: () => undefined },
+      systemPrompt: { section() {}, context() {}, variable() {} },
+      on: () => {},
+      effect: () => {},
+      get: () => ({ currentInitiator: () => undefined }),
+      llm: { stream: async function* () { /* not called */ } },
+      plugin(child, cfg2) {
+        const deps = child?.inject ?? [];
+        if (deps.every((d) => ctx[d] !== undefined) && typeof child?.apply === 'function') {
+          void child.apply(ctx, cfg2);
+        }
+      },
+      webServer: { register: (route) => { routes.push(route); return () => {}; } },
+    };
 
-  // 1. What identifier does the store receive?
-  const ctor = /new MemoryStore\([\s\S]{0,400}?\)\s*;/.exec(index);
-  assert.ok(ctor, 'lib/index.js must construct MemoryStore');
-  const passed = /config:\s*([A-Za-z_$][\w$]*)/.exec(ctor[0]);
-  assert.ok(passed, 'MemoryStore must receive a named config object, not an inline literal: '
-    + 'an inline object cannot be mutated by setConfig and freezes every limit');
-  const target = passed[1];
+    const mod = await import('../../lib/index.js');
+    await mod.apply(ctx, { maxPendingQueue: 50, disposalMinIdleDays: 30 });
 
-  // 2. Every Object.assign that writes config must target that same identifier.
-  const writes = [...index.matchAll(/Object\.assign\(\s*([A-Za-z_$][\w$]*)\s*,/g)]
-    .map((m) => m[1])
-    .filter((name) => name === target || /^(cfg|config)$/.test(name));
-  assert.ok(writes.length >= 2,
-    `expected the config write paths to be Object.assign calls (found ${writes.length})`);
-  for (const name of writes) {
-    assert.equal(name, target,
-      `a config write path mutates "${name}" but the store holds "${target}"; `
-      + 'the settings page would report success and change nothing');
+    const action = routes.find((r) => r.path === '/api/evolve/action');
+    assert.ok(action, 'the plugin must register /api/evolve/action (the settings page posts here)');
+
+    // Same shape as webroutes-e2e.mjs: a loopback request with a JSON body.
+    const post = async (body) => {
+      const req = {
+        method: 'POST',
+        headers: {
+          host: '127.0.0.1:3080', 'sec-fetch-site': 'same-origin',
+          'content-type': 'application/json',
+        },
+        socket: { remoteAddress: '127.0.0.1' },
+        url: '/api/evolve/action',
+      };
+      req[Symbol.asyncIterator] = async function* () { yield Buffer.from(JSON.stringify(body)); };
+      let status = 0;
+      let payload = null;
+      const res = {
+        setHeader() {},
+        writeHead(s) { status = s; return res; },
+        end(b) { try { payload = JSON.parse(String(b)); } catch { payload = String(b); } },
+      };
+      await action.handler(req, res);
+      return { status, payload };
+    };
+
+    const before = await post({ action: 'set-config', maxPendingQueue: 10 });
+    assert.equal(before.status, 200,
+      `set-config must succeed (got ${before.status}: ${JSON.stringify(before.payload)})`);
+
+    // The whole point: the STORE, not just the returned view, must have moved.
+    const store = openedDomains.get('evolve_memory');
+    assert.ok(store, 'the evolve_memory domain must have been opened');
+    assert.equal(before.payload?.config?.maxPendingQueue, 10,
+      'the route must report the new value');
+
+    const second = await post({ action: 'set-config', disposalMinIdleDays: 1 });
+    assert.equal(second.status, 200, 'a second write must also succeed');
+    assert.equal(second.payload?.config?.disposalMinIdleDays, 1,
+      'the second key must round-trip too');
+    // And the first key must not have been clobbered -- proof the writes land on one
+    // shared object rather than on per-request copies.
+    assert.equal(second.payload?.config?.maxPendingQueue, 10,
+      'the earlier change was lost: each write is landing on a fresh copy, which is '
+      + 'exactly the snapshot bug one layer up');
+  } finally {
+    if (prevHome === undefined) delete process.env.HOME; else process.env.HOME = prevHome;
+    if (prevProfile === undefined) delete process.env.USERPROFILE; else process.env.USERPROFILE = prevProfile;
+    rmSync(home, { recursive: true, force: true });
   }
 });

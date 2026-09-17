@@ -83,29 +83,72 @@ function splitCallArgs(text, openIdx) {
   return { args, end: i };
 }
 
+const lineOf = (text, idx) => text.slice(0, idx).split('\n').length;
+
+/**
+ * Text from `from` to the end of the block that contains it, so "is this handle
+ * flushed?" is answered within one scope instead of within N characters.
+ */
+function enclosingBlock(text, from) {
+  let depth = 0;
+  for (let i = from; i < text.length; i += 1) {
+    const ch = text[i];
+    if (ch === '{') depth += 1;
+    else if (ch === '}') {
+      if (depth === 0) return text.slice(from, i);
+      depth -= 1;
+    }
+  }
+  return text.slice(from);
+}
+
 /** Every openSync(<path>, 'r'|'r+') whose handle is then fsynced. */
 function pathLevelFsyncs(text) {
   const hits = [];
+  const unknownModes = [];
   for (const m of text.matchAll(/openSync\(/g)) {
     const { args, end } = splitCallArgs(text, m.index + m[0].length);
     if (args.length < 2) continue;
-    const mode = args[1].trim();
+    const raw = args[1].trim();
+    // Quote style is not semantics: openSync(p, "r") is the same call as
+    // openSync(p, 'r'). v0.6.3 compared against "'r'" literally, so the double-quoted
+    // form was invisible -- the identical half-measure the bracket-balanced splitting
+    // was introduced to end.
+    const lit = /^(['"`])(.*)\1$/.exec(raw);
+    if (!lit) {
+      // A computed mode cannot be judged statically. Treat it as suspicious rather
+      // than as compliant: `const M='r'; openSync(p, M)` would otherwise walk past.
+      unknownModes.push({ line: lineOf(text, m.index), arg: args[0], mode: raw });
+      continue;
+    }
+    const mode = lit[2];
     // Only read modes matter: a handle already open for writing carries its mode
     // at the call site and is a different, legitimate pattern.
-    if (mode !== "'r'" && mode !== "'r+'") continue;
-    const after = text.slice(end, end + 400);
-    if (!/fsyncSync\s*\(/.test(after)) continue;
-    hits.push({ line: text.slice(0, m.index).split('\n').length, arg: args[0], mode });
+    if (mode !== 'r' && mode !== 'r+') continue;
+    // Look to the end of the ENCLOSING BLOCK, not a fixed character budget. v0.6.3
+    // used `end + 400`, and this repo already has single-line modules hundreds of
+    // characters wide (reservations.js:6, skill-proposals.js:53), where an open and
+    // its flush trivially land more than 400 apart.
+    if (!/fsyncSync\s*\(/.test(enclosingBlock(text, end))) continue;
+    hits.push({ line: lineOf(text, m.index), arg: args[0], mode });
+  }
+  // A computed mode next to an fsync is reported too: it may be 'r'.
+  for (const u of unknownModes) {
+    if (/fsyncSync\s*\(/.test(text)) hits.push({ ...u, computed: true });
   }
   return hits;
 }
 
 function pathLevelFsyncModules() {
-  const all = readdirSync(libDir).filter((f) => f.endsWith('.js') && f !== 'fsync.js');
+  // Recursive: lib/ is flat today, but the moment anyone groups modules into
+  // lib/ops/ or lib/memory/ a single-level scan silently stops covering them.
+  const all = readdirSync(libDir, { recursive: true })
+    .map((f) => String(f).split('\\').join('/'))
+    .filter((f) => f.endsWith('.js') && f !== 'fsync.js');
   const offenders = [];
   for (const f of all) {
     for (const hit of pathLevelFsyncs(read(f))) {
-      offenders.push(`${f}:${hit.line} openSync(${hit.arg}, ${hit.mode})`);
+      offenders.push(`${f}:${hit.line} openSync(${hit.arg}, ${hit.computed ? `${hit.mode} (computed)` : `'${hit.mode}'`})`);
     }
   }
   return offenders;
@@ -313,6 +356,18 @@ test('fsyncFile needs a write-capable handle (runtime)', async (t) => {
   const root = mkdtempSync(join(tmpdir(), 'dsh-evolve-ro-'));
   try {
     if (!readOnlyIsEnforced(root)) {
+      // A skip does not count as a failure, so this is the one place where the only
+      // non-source-text evidence in the file can vanish quietly -- v0.6.3 could be
+      // reduced to a permanent skip by making this probe return false. Refuse to skip
+      // unless the environment genuinely explains it.
+      const excused = (process.getuid && process.getuid() === 0)
+        || process.env.DSH_EVOLVE_ALLOW_RO_SKIP === '1';
+      assert.ok(excused,
+        'the read-only bit is not enforced here, but this is not root either. That '
+        + 'combination usually means the probe itself broke rather than the filesystem '
+        + 'being unusual -- and skipping would silently remove the only runtime proof '
+        + "that fsyncFile opens 'r+'. Set DSH_EVOLVE_ALLOW_RO_SKIP=1 if this really is "
+        + 'a FAT/exFAT or network mount.');
       t.skip('this filesystem does not enforce the read-only bit (root, or FAT/exFAT)');
       return;
     }
@@ -367,4 +422,71 @@ test('every test fixture on disk is actually tracked by git', () => {
       `${rel} exists on disk but git does not track it -- check .gitignore, `
       + 'a fresh clone would not have it');
   }
+});
+
+
+/**
+ * F7/F8: the degradation record must have a consumer, and must not carry a field
+ * that always says "fine".
+ *
+ * v0.6.3 wrote `durability` onto the marker and nothing read it -- a note waiting to
+ * be deleted by whoever next tidies up unused fields, and the only durable trace that
+ * a tree was published without a full flush. It also returned an `ok` from fsyncTree
+ * that was true unconditionally, which invites `if (!ok) abort` that can never fire.
+ */
+test('a degraded publish is both recorded and read back', () => {
+  const runtime = read('op-runtime.js');
+  const protocols = read('publish-protocols.js');
+
+  // Written by the publish side...
+  assert.match(protocols, /durability:/,
+    'publish-protocols must stamp the degradation onto the marker');
+
+  // ...and read by the recovery side, at every point that INTERPRETS a marker.
+  // Protocol B is excluded by construction: it commits via a state block inside the
+  // file itself and writes no marker, so it has no durability note to carry.
+  const markerReads = [...runtime.matchAll(/readMarker\(([^)]*)\)/g)];
+  assert.ok(markerReads.length >= 3,
+    `expected several marker reads in reconcile (found ${markerReads.length})`);
+  for (const m of markerReads) {
+    const after = runtime.slice(m.index, m.index + 500);
+    const verdict = after.indexOf("verdict: 'roll-forward'");
+    if (verdict < 0) continue;                 // not a commit-confirming read
+    assert.match(after.slice(verdict, verdict + 220), /degraded\(/,
+      'a roll-forward that trusts a marker must also carry its durability note, or a '
+      + 'degraded publish leaves no trace outside the log');
+  }
+  assert.match(runtime, /function degraded\(/, 'op-runtime must define the reader');
+
+  // And fsyncTree must not resurrect an always-true ok.
+  const tree = runtime.slice(runtime.indexOf('export function fsyncTree'));
+  const body = tree.slice(0, tree.indexOf('\n}'));
+  assert.equal(/ok:\s*true/.test(body), false,
+    'fsyncTree must not return a hard-coded ok: a field named ok that is always true '
+    + 'invites `if (!ok) abort` that never fires');
+});
+
+/**
+ * F10: budgetStatus takes records whose injectionCount is already the EFFECTIVE
+ * count. Only the store can compute that, so the contract lives in a comment -- and
+ * a comment cannot stop a second caller from passing raw records and quietly
+ * reintroducing the second definition this release removed.
+ */
+test('budgetStatus has exactly one caller, the store that substitutes effective counts', () => {
+  const files = readdirSync(libDir, { recursive: true })
+    .map((f) => String(f).split('\\').join('/'))
+    .filter((f) => f.endsWith('.js') && f !== 'memory-convergence.js');
+  const callers = files.filter((f) => /\bbudgetStatus\(/.test(read(f)));
+  assert.deepEqual(callers, ['store.js'],
+    'budgetStatus expects effective injection counts, which only the store can '
+    + `compute; another caller would pass raw records: ${callers.join(', ')}`);
+  const store = read('store.js');
+  const call = /budgetStatus\(([^,]+),/.exec(store);
+  assert.ok(call, 'store.js must call budgetStatus');
+  assert.equal(/confirmed\(\)/.test(call[1]), false,
+    'store.js passes this.confirmed() straight through, so the tie-break reads the '
+    + 'persisted injectionCount instead of the effective one -- the two definitions '
+    + 'are back');
+  assert.match(store, /effectiveInjectionCount\(/,
+    'store.js must substitute effective injection counts before calling');
 });

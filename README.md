@@ -39,7 +39,7 @@ dsh plugin --profile web add github:chenzheshushi-commits/dsh-evolve
 Pin a specific release instead of tracking `main`:
 
 ```bash
-dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.6.3/dsh-evolve-0.6.3.tgz"
+dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.6.4/dsh-evolve-0.6.4.tgz"
 ```
 
 Then restart the harness — tools are discovered at startup, not hot-reloaded.
@@ -185,6 +185,47 @@ behavior on failure. Nothing runs in your main loop.
 - **No internal timers.** In-session work hangs off events; offline work is an external cron calling a tool.
 - **Ship blank.** No preloaded personal data. What it learns stays on your machine and is never packaged.
 - **Mechanisms over model smarts.** Safety comes from deterministic rules, so swapping models changes quality, never safety.
+
+---
+
+## What's new in v0.6.4 — Guards judged by behaviour, everywhere
+
+v0.6.4 is a patch release, acting on a review of v0.6.3 that reproduced every claim
+that release made (15/15 mutations red, 8/8 quoted numbers recomputed) and then found
+where the new guards stopped short.
+
+- **`EROFS` was a dead branch that inverted its own intent.** It was listed in
+  `NOT_WRITABLE` but not in `FSYNC_SOFT_FAIL`, and the rethrow guard runs first — so
+  the one code most literally meaning "this object is read-only" was the one code that
+  threw, aborting all three publish protocols. Exactly backwards from the v0.6.3 fix.
+  Reachable on read-only mounts and `--read-only` containers. `EROFS` now soft-fails,
+  and the subset invariant is enforced **at module load**, not by a test: a member that
+  cannot be classified is a contradiction inside the file. Putting `ENOSPC` in
+  `NOT_WRITABLE` — marking a real failure as a permissions quirk — now refuses to load.
+- **The config guard failed correct refactors.** It matched
+  `/Object\.assign\(\s*(\w+)\s*,/` against `index.js` and compared identifiers, so
+  rewriting one line as `for (const [k,v] of Object.entries(patch)) cfg[k] = v` —
+  byte-for-byte identical behaviour — went red, while the real defect was caught only
+  as a side effect of a `>= 2` count. A guard that fails correct work teaches people to
+  ignore red. It now POSTs the actual `set-config` action to the actual route and reads
+  the actual store; measured: the equivalent refactor passes, assigning onto a copy
+  fails.
+- **Four blind spots in the fsync scan, all measured.** Double-quoted `openSync(p, "r")`
+  was invisible (quote style is not semantics); a computed mode was treated as
+  compliant rather than unjudgeable; the flush had to appear within 400 characters,
+  while this repo already has single-line modules wider than that; and discovery only
+  read the top level of `lib/`, so any future `lib/ops/` would be uncovered. Now:
+  quotes normalised, computed modes reported, scope-based lookahead, recursive scan.
+- **The one runtime proof could be switched off silently.** Making the read-only probe
+  return `false` turned the only non-source-text evidence into a permanent skip, and a
+  skip is not a failure. A skip now has to be justified by the environment.
+- **`fsyncTree` no longer returns an always-true `ok`** — a field named `ok` invites
+  `if (!ok) abort` that never fires — and the `durability` note stamped on a marker now
+  reaches the reconcile verdict instead of having no reader at all.
+- `budgetStatus`'s effective-count contract, previously only a comment, is asserted;
+  the `search.js` floor comment said 0.5 where the implementation says 0.6.
+
+Retrieval precision is unchanged and still tracked as issue #2.
 
 ---
 
