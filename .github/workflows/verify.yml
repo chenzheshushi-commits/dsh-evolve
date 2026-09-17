@@ -19,6 +19,14 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    env:
+      # Windows Python writes stdout in the console's ANSI code page (cp1252 on
+      # this runner), so a non-ASCII character in a gate's output raises
+      # UnicodeEncodeError after every check has already passed. The ASCII rule in
+      # scripts/schema/gate-scripts-ascii.test.mjs is the real fix; this is belt
+      # and braces for anything printed from data rather than from source.
+      PYTHONIOENCODING: utf-8
+      PYTHONUTF8: '1'
     steps:
       # autocrlf off + .gitattributes eol=lf: without both, the Windows leg checks
       # out lib/client.js as CRLF, tsdown rewrites it as LF, and the artifact diff

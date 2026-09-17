@@ -95,7 +95,7 @@ def main():
         check('marker travelled with the tree', (dest / MARKER_NAME).exists())
 
         committed = tree_hash(dest)
-        check('⭐ beforeTreeHash == committedTreeHash (plan 0L.2)',
+        check('*** beforeTreeHash == committedTreeHash (plan 0L.2)',
               committed == before, f'{before[:12]} vs {committed[:12]}')
 
         # 4. the exclusion must be the ONLY reason they match: prove the hasher
