@@ -1,0 +1,7 @@
+# lib/client.js is a COMMITTED build artifact and CI diffs it against a fresh
+# build to catch a stale one (F7). On a Windows runner core.autocrlf would check
+# it out as CRLF while tsdown writes LF, so that diff would fail for a reason
+# that has nothing to do with the code. Pin the whole repo to LF instead of
+# special-casing the check.
+* text=auto eol=lf
+*.tgz binary

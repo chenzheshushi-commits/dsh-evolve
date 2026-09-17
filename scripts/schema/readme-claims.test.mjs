@@ -18,10 +18,29 @@ const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.ur
 const index = readFileSync(new URL('../../lib/index.js', import.meta.url), 'utf8');
 const spec = readFileSync(new URL('../../lib/spec.js', import.meta.url), 'utf8');
 
-/** The v0.6.0 section, so a claim from an older release cannot satisfy a check. */
+/** The current version's section, so a claim from an older release cannot satisfy a check. */
 function currentSection() {
   const start = readme.indexOf(`## What's new in v${pkg.version}`);
   assert.ok(start > 0, `README must have a "What's new in v${pkg.version}" section`);
+  const next = readme.indexOf("\n## What's new in v", start + 10);
+  return readme.slice(start, next === -1 ? readme.length : next);
+}
+
+/**
+ * A PATCH release (x.y.Z, Z > 0) ships no new configuration by definition, so the
+ * config-table and boundary checks below must read the FEATURE section they belong
+ * to (x.y.0) instead of the patch note. Without this, a patch release could only
+ * pass by copy-pasting a config table it did not change -- which is exactly the
+ * documentation drift this file exists to prevent.
+ */
+function featureSection() {
+  const [maj, min, patch] = pkg.version.split('.');
+  if (patch === '0') return currentSection();
+  const anchor = `## What's new in v${maj}.${min}.0`;
+  const start = readme.indexOf(anchor);
+  assert.ok(start > 0,
+    `v${pkg.version} is a patch release, so README must still carry the "${anchor}" `
+    + 'section that documents the configuration it inherits');
   const next = readme.indexOf("\n## What's new in v", start + 10);
   return readme.slice(start, next === -1 ? readme.length : next);
 }
@@ -34,7 +53,7 @@ test('the pin URL matches the version being shipped', () => {
 });
 
 test('every documented config key exists in the schema', () => {
-  const section = currentSection();
+  const section = featureSection();
   // The config table rows look like: | `key` | `default` | effect |
   const rows = [...section.matchAll(/^\|\s*`([a-zA-Z]+)`(?:\s*\/\s*`([a-zA-Z]+)`)?\s*\|/gm)];
   assert.ok(rows.length >= 5, `the config table must be parseable (found ${rows.length} rows)`);
@@ -46,7 +65,7 @@ test('every documented config key exists in the schema', () => {
 });
 
 test('documented config defaults match the schema defaults', () => {
-  const section = currentSection();
+  const section = featureSection();
   const rows = [...section.matchAll(/^\|\s*`([a-zA-Z]+)`\s*\|\s*`?([a-zA-Z0-9]+)`?\s*\|/gm)];
   const checked = [];
   for (const [, key, documented] of rows) {
@@ -64,7 +83,7 @@ test('documented config defaults match the schema defaults', () => {
 });
 
 test('the multi-process boundary describes the lock that exists', () => {
-  const section = currentSection();
+  const section = featureSection();
   // An instance lock IS implemented, so the old "unsupported" claim would now be
   // both wrong and scarier than reality.
   assert.equal(/Multiple processes sharing one evolve workspace are unsupported/.test(section), false,
@@ -78,7 +97,7 @@ test('the multi-process boundary describes the lock that exists', () => {
 });
 
 test('claims about approval outcomes match the tool', () => {
-  const section = currentSection();
+  const section = featureSection();
   if (!/approval/i.test(section)) return;
   // The README states that cancelling leaves the memory pending and declining
   // reports it rejected. Both are observable in index.js.
@@ -89,7 +108,7 @@ test('claims about approval outcomes match the tool', () => {
 });
 
 test('claims about cross-filesystem behaviour match the protocols', () => {
-  const section = currentSection();
+  const section = featureSection();
   if (!/[Cc]ross-filesystem/.test(section)) return;
   const protocols = readFileSync(new URL('../../lib/publish-protocols.js', import.meta.url), 'utf8');
   // Anchored on the CHECK function, not on the first mention of EXDEV -- the first
@@ -116,7 +135,7 @@ test('claims about cross-filesystem behaviour match the protocols', () => {
 });
 
 test('the archive claim matches how archives are actually named', () => {
-  const section = currentSection();
+  const section = featureSection();
   if (!/archiveId/.test(section)) return;
   const ops = readFileSync(new URL('../../lib/skill-operations.js', import.meta.url), 'utf8');
   assert.match(ops, /archiveId/, 'archives must genuinely be addressed by id');
@@ -124,7 +143,7 @@ test('the archive claim matches how archives are actually named', () => {
 });
 
 test('the rollback claim matches the tool', () => {
-  const section = currentSection();
+  const section = featureSection();
   if (!/skill_rollback/.test(section)) return;
   // The README says rollback only ever creates a proposal. If the tool could roll
   // back directly, that sentence would be actively dangerous advice.
@@ -135,4 +154,26 @@ test('the rollback claim matches the tool', () => {
   assert.match(block, /sealRollbackArtifact/, 'and pin the artifact by hash');
   assert.equal(/skillTx\.rollbackSkill/.test(block), false,
     'the tool must not perform the rollback itself');
+});
+
+
+/**
+ * The platform row is a boundary claim like any other, and it was WRONG in v0.6.0:
+ * it said "Windows is untested", which reads as "some edges may be rough". The
+ * truth was that ProposalStore.create() threw EPERM on Windows, so skill evolution
+ * in the DEFAULT approval modes did not work at all. Once the fsync guards exist,
+ * the row must not still describe an untested platform.
+ */
+test('the platform row matches the fsync guards that are shipped', () => {
+  const proposals = readFileSync(new URL('../../lib/skill-proposals.js', import.meta.url), 'utf8');
+  const guarded = /FSYNC_SOFT_FAIL/.test(proposals) && /openSync\(p, 'r\+'\)/.test(proposals);
+  const row = readme.split('\n').find((l) => /^\|\s*(Linux|Windows)/.test(l) && /Windows/.test(l));
+  assert.ok(row, 'README must carry a platform-support row mentioning Windows');
+  if (guarded) {
+    assert.equal(/Windows is untested/.test(row), false,
+      'the Windows fsync guards are shipped, so "Windows is untested" is stale: it '
+      + 'both understates what was broken before and hides that it is now covered');
+    assert.match(row, /Windows/,
+      'the row must still state the platform position explicitly');
+  }
 });

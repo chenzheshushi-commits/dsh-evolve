@@ -1,0 +1,52 @@
+name: verify
+
+# The whole point of this workflow is the `windows-latest` leg. v0.6.0 was green
+# on 303 tests on one Linux box and still shipped a Windows EPERM that killed the
+# proposal pipeline in the DEFAULT approval modes -- nothing but a second OS could
+# have caught it. Keep both legs required.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      # autocrlf off + .gitattributes eol=lf: without both, the Windows leg checks
+      # out lib/client.js as CRLF, tsdown rewrites it as LF, and the artifact diff
+      # below fails for a line-ending reason instead of a real one.
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+
+      # corepack honours "packageManager": "pnpm@12.4.1" in package.json, so every
+      # leg resolves the committed lockfile instead of inventing its own tree.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm run typecheck
+      - run: pnpm run build
+
+      # F7: lib/client.js is a COMMITTED build artifact and `files` ships only lib/,
+      # so a stale artifact is a shipped bug that no test can see. Fail here rather
+      # than rely on a human running this diff before tagging.
+      - name: built client is in sync with src/
+        run: git diff --exit-code -- lib/client.js
+        shell: bash
+
+      - run: pnpm run test
+      - run: pnpm run test:contracts
+
+      # test:baseline needs a real ~/.dsh/storages/evolve_memory.json and is
+      # deliberately excluded: a synthetic corpus would report recall numbers that
+      # mean nothing. It stays a local pre-release step.

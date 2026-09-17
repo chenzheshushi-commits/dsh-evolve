@@ -20,7 +20,7 @@ mechanisms and rules. Everything it learns is local to your install and never le
 | **DeepSeek Harness** `0.1.0-rc.7`+ | Host platform. Provides tools, storage, LLM, and (optionally) the web server. |
 | `git` on PATH *(optional)* | Enables automatic memory checkpoints you can roll back. Without it, checkpoints are skipped. |
 | `tar` on PATH | Required for skill rewrites that need a rollback snapshot. A failed backup aborts refine/fold instead of risking an unrecoverable overwrite. |
-| Linux / macOS | Developed and tested here. Windows is untested — path handling is platform-neutral, but `git`/`tar` availability differs. |
+| Linux / macOS / Windows | Developed on Linux; CI runs the full suite on Linux **and** Windows. Windows needs `git`/`tar` on PATH for the optional checkpoint and rollback features — the plugin skips them rather than failing when they are absent. (v0.6.0 and earlier threw `EPERM` on Windows the moment a skill proposal was written; fixed in v0.6.1.) |
 
 Degradation is graceful by design: if SQLite/FTS5 is unavailable the plugin falls back to
 pure bigram recall, and any optional dependency that's missing disables only its own feature.
@@ -39,7 +39,7 @@ dsh plugin --profile web add github:chenzheshushi-commits/dsh-evolve
 Pin a specific release instead of tracking `main`:
 
 ```bash
-dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.6.0/dsh-evolve-0.6.0.tgz"
+dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.6.1/dsh-evolve-0.6.1.tgz"
 ```
 
 Then restart the harness — tools are discovered at startup, not hot-reloaded.
@@ -188,7 +188,37 @@ behavior on failure. Nothing runs in your main loop.
 
 ---
 
----
+## What's new in v0.6.1 — Windows platform fix and cross-OS CI
+
+v0.6.1 is a patch release: no new configuration, no behaviour change on Linux or macOS.
+It fixes one platform bug and closes the verification gap that let it ship.
+
+- **Skill proposals no longer throw on Windows.** `ProposalStore.create()` fsynced
+  its files through an `O_RDONLY` handle and fsynced directories with no guard.
+  Windows `FlushFileBuffers` requires write access, so it raised `EPERM` — and since
+  `create()` is the single entry point of the proposal pipeline, `skill_rollback` and
+  every crystallize/refine/fold/converge in the **default** `manual`/`balanced` modes
+  threw instead of returning `{proposed:false, reason}`. Files now open `r+`; directory
+  fsync failures soft-fail through the same code list the transaction layer already
+  used (`EINVAL`/`EACCES`/`EPERM`/`EISDIR`/`ENOTSUP`).
+- **`fsyncTree` actually flushes files again.** It synced regular files through the
+  directory helper, whose soft-fail list swallowed the resulting `EPERM`. On Windows
+  the files were therefore never flushed — silently, which is worse than the throw,
+  because protocol C/D recovery treats a written marker as proof the tree is durable.
+- **CI exists.** A `ubuntu-latest` + `windows-latest` matrix runs typecheck, build,
+  the full suite and the contract gates. v0.6.0 was green on 303 tests on one Linux
+  machine and still shipped the bug above; nothing short of a second OS would have
+  caught it.
+- **The built client is gated, not hand-checked.** `lib/client.js` is a committed
+  artifact and `files` ships only `lib/`, so CI rebuilds and diffs it. A stale
+  artifact used to be caught only by remembering to run one command before tagging.
+- **A known retrieval hole is now visible instead of implied.** A precision red-line
+  in `smoke.mjs` passed only because its fixture happened not to contain the shared
+  2-gram it was guarding against; phrased the ordinary way, an unrelated query
+  false-matches. It is recorded as a failing `test.todo` in
+  `scripts/schema/f3-precision-hole.test.mjs` with the measurements showing why a
+  threshold change alone cannot fix it. Retrieval behaviour is **unchanged** in this
+  release — the fix lands in v0.7.0 with recall/MRR evidence.
 
 ---
 
