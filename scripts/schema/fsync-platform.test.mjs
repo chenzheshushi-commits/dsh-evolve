@@ -27,6 +27,8 @@ import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { enclosingStatement, functionBody } from './source-scope.mjs';
+
 const libDir = fileURLToPath(new URL('../../lib/', import.meta.url));
 const read = (f) => readFileSync(`${libDir}${f}`, 'utf8');
 
@@ -360,14 +362,20 @@ test('fsyncFile needs a write-capable handle (runtime)', async (t) => {
       // non-source-text evidence in the file can vanish quietly -- v0.6.3 could be
       // reduced to a permanent skip by making this probe return false. Refuse to skip
       // unless the environment genuinely explains it.
-      const excused = (process.getuid && process.getuid() === 0)
+      // `process.getuid` only exists on POSIX. Reading it as the sole excuse meant
+      // that on Windows -- where a non-enforcing filesystem is ordinary, and where
+      // this fsync behaviour matters most -- the check HARD FAILED instead of
+      // skipping, for a reason that has nothing to do with the code under test.
+      const isRoot = typeof process.getuid === 'function' && process.getuid() === 0;
+      const excused = isRoot
+        || process.platform === 'win32'
         || process.env.DSH_EVOLVE_ALLOW_RO_SKIP === '1';
       assert.ok(excused,
-        'the read-only bit is not enforced here, but this is not root either. That '
-        + 'combination usually means the probe itself broke rather than the filesystem '
-        + 'being unusual -- and skipping would silently remove the only runtime proof '
-        + "that fsyncFile opens 'r+'. Set DSH_EVOLVE_ALLOW_RO_SKIP=1 if this really is "
-        + 'a FAT/exFAT or network mount.');
+        'the read-only bit is not enforced here, and this is neither root nor Windows. '
+        + 'That combination usually means the probe itself broke rather than the '
+        + 'filesystem being unusual -- and skipping would silently remove the only '
+        + "runtime proof that fsyncFile opens 'r+'. Set DSH_EVOLVE_ALLOW_RO_SKIP=1 if "
+        + 'this really is a FAT/exFAT or network mount.');
       t.skip('this filesystem does not enforce the read-only bit (root, or FAT/exFAT)');
       return;
     }
@@ -448,19 +456,45 @@ test('a degraded publish is both recorded and read back', () => {
   const markerReads = [...runtime.matchAll(/readMarker\(([^)]*)\)/g)];
   assert.ok(markerReads.length >= 3,
     `expected several marker reads in reconcile (found ${markerReads.length})`);
-  for (const m of markerReads) {
-    const after = runtime.slice(m.index, m.index + 500);
-    const verdict = after.indexOf("verdict: 'roll-forward'");
-    if (verdict < 0) continue;                 // not a commit-confirming read
-    assert.match(after.slice(verdict, verdict + 220), /degraded\(/,
+  // Both windows here were character counts (500 then 220). The 500 was a measured
+  // false negative -- a marker read whose roll-forward sat further away was simply
+  // not seen -- and the 220 was a false positive waiting to happen, since reordering
+  // the keys of an object literal moves `degraded(` in or out of range without
+  // changing behaviour. Each roll-forward is one return statement, so read that.
+  // Only roll-forwards that TRUST A MARKER need the durability note. Protocol B
+  // commits via a state block inside the file and writes no marker, so its
+  // roll-forward has no note to carry -- the original version of this check excluded
+  // it by scanning from readMarker() calls, and that exclusion is load-bearing.
+  let confirmingReads = 0;
+  let stateBlockReads = 0;
+  for (const m of runtime.matchAll(/return \{ verdict: 'roll-forward'/g)) {
+    const statement = enclosingStatement(runtime, m.index);
+    if (/state block/.test(statement)) { stateBlockReads += 1; continue; }
+    confirmingReads += 1;
+    assert.match(statement, /degraded\(/,
       'a roll-forward that trusts a marker must also carry its durability note, or a '
       + 'degraded publish leaves no trace outside the log');
   }
+  assert.equal(confirmingReads, 3,
+    `expected the three marker-trusting roll-forwards (found ${confirmingReads})`);
+  assert.equal(stateBlockReads, 1,
+    'protocol B is the one marker-free roll-forward; if this count changes, the '
+    + 'exclusion above needs rechecking rather than widening');
   assert.match(runtime, /function degraded\(/, 'op-runtime must define the reader');
 
+  // The chain has a THIRD link, and it was missing until v0.7.0: reconcile() rebuilt
+  // the verdict into report.pending and kept only verdict+reason, so the fields
+  // degraded() had just supplied were dropped on every pass while the comment above
+  // it claimed the consumer existed. Assert the forwarding, not just the production.
+  const push = enclosingStatement(runtime, runtime.indexOf('report.pending.push('));
+  for (const field of ['durability', 'unflushed']) {
+    assert.match(push, new RegExp(field),
+      `reconcile must forward ${field} into report.pending, or the durability note `
+      + 'dies one layer before anyone can read it');
+  }
+
   // And fsyncTree must not resurrect an always-true ok.
-  const tree = runtime.slice(runtime.indexOf('export function fsyncTree'));
-  const body = tree.slice(0, tree.indexOf('\n}'));
+  const body = functionBody(runtime, runtime.indexOf('export function fsyncTree'));
   assert.equal(/ok:\s*true/.test(body), false,
     'fsyncTree must not return a hard-coded ok: a field named ok that is always true '
     + 'invites `if (!ok) abort` that never fires');

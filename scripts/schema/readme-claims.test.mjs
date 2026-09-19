@@ -11,7 +11,9 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
+
+import { functionBody, enclosingStatement, splitCallArgs, lineOf } from './source-scope.mjs';
 
 const readme = readFileSync(new URL('../../README.md', import.meta.url), 'utf8');
 const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
@@ -118,8 +120,10 @@ test('claims about cross-filesystem behaviour match the protocols', () => {
   assert.ok(fnStart > 0,
     'the same-filesystem check must exist as a named function, so every protocol '
     + 'goes through one implementation instead of repeating the test');
-  const after = protocols.indexOf('\nfunction ', fnStart + 10);
-  const checkFn = protocols.slice(fnStart, after === -1 ? fnStart + 1200 : after);
+  // Was `slice(fnStart, after === -1 ? fnStart + 1200 : after)`: the fallback arm of
+  // that ternary is a character window, and it is the arm that runs whenever the
+  // function happens to be the last one in the file. A scope has no fallback arm.
+  const checkFn = functionBody(protocols, fnStart);
   // Staging legitimately copies an existing skill tree so a rewrite keeps its
   // references/ and scripts/; the ban applies to the move path only.
   assert.equal(/cpSync|copyFileSync/.test(checkFn), false,
@@ -149,7 +153,10 @@ test('the rollback claim matches the tool', () => {
   // back directly, that sentence would be actively dangerous advice.
   const start = index.indexOf("name: 'skill_rollback'");
   assert.ok(start > 0, 'the tool must exist');
-  const block = index.slice(start, start + 2000);
+  // Was `slice(start, start + 2000)` with 596 characters of real headroom -- 2432
+  // characters of comment turned it red. The tool is one object literal, so read
+  // exactly that object.
+  const block = enclosingStatement(index, start);
   assert.match(block, /proposalStore\.create/, 'it must create a proposal');
   assert.match(block, /sealRollbackArtifact/, 'and pin the artifact by hash');
   assert.equal(/skillTx\.rollbackSkill/.test(block), false,
@@ -176,4 +183,42 @@ test('the platform row matches the fsync guards that are shipped', () => {
     assert.match(row, /Windows/,
       'the row must still state the platform position explicitly');
   }
+});
+
+test('the README claim that no gate uses a character window is true', () => {
+  // README says "no gate in scripts/schema/ judges adjacency by character count any
+  // more". That is a countable claim, so count it here rather than trusting prose:
+  // v0.6.5's README said "two guards" while ten existed.
+  const readme = readFileSync(new URL('../../README.md', import.meta.url), 'utf8');
+  if (!/judges adjacency by character count/.test(readme)) return;
+
+  const dir = new URL('.', import.meta.url);
+  const offenders = [];
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith('.mjs')) continue;
+    // source-scope.mjs is the replacement mechanism: its cursor arithmetic
+    // (`slice(from, i + 1)`) is how a scope END is computed, not an adjacency window.
+    if (name === 'source-scope.mjs') continue;
+    const text = readFileSync(new URL(name, dir), 'utf8');
+    for (const m of text.matchAll(/\.(?:slice|substring)\(/g)) {
+      // Prose describing the windows this release removed is not a window. Skip any
+      // match inside a comment -- without this the fix's own explanation trips it.
+      const lineStart = text.lastIndexOf('\n', m.index) + 1;
+      const before = text.slice(lineStart, m.index);
+      if (/^\s*(?:\/\/|\*|\/\*)/.test(before)) continue;
+
+      const { args } = splitCallArgs(text, m.index + m[0].length);
+      if (args.length < 2) continue;
+      // The banned shape is a LENGTH added to the start: slice(i, i + 400) with a
+      // number large enough to be a character budget. Cursor steps (+ 1, + 2) are
+      // ordinary index arithmetic.
+      const budget = /\+\s*(\d+)\s*$/.exec(args[1]);
+      if (budget && Number(budget[1]) > 10) {
+        offenders.push(`${name}:${lineOf(text, m.index)}`);
+      }
+    }
+  }
+  assert.deepEqual(offenders, [],
+    'these gates still use a fixed character window, so the README sentence is false; '
+    + 'either fix them with source-scope.mjs or correct the README');
 });

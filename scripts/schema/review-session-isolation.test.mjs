@@ -23,6 +23,8 @@
  */
 
 import test from 'node:test';
+
+import { enclosingStatement } from './source-scope.mjs';
 import assert from 'node:assert/strict';
 
 import { TurnSnapshotCollector } from '../../lib/review.js';
@@ -234,7 +236,16 @@ test('index.js wires review state per session, not process-wide', async () => {
   const asyncIdx = src.indexOf('void (async () => {', consumeIdx);
   assert.ok(asyncIdx > consumeIdx, 'the fire-and-forget review task must exist');
   const beforeAsync = src.slice(consumeIdx, asyncIdx);
-  const insideAsync = src.slice(asyncIdx, asyncIdx + 2000);
+  // This was `slice(asyncIdx, asyncIdx + 2000)`, and because the assertion below is
+  // NEGATIVE the window failed in the quiet direction: a task longer than 2000
+  // characters simply stopped being checked past that point, so the guard could pass
+  // while the very thing it bans sat at character 2100. (Measured: 2253 characters of
+  // comment injected into the task left all 12 tests green.) The task is one
+  // statement -- `void (async () => { ... })();` -- so bound it by that statement and
+  // the whole body is always covered.
+  const insideAsync = enclosingStatement(src, asyncIdx);
+  assert.ok(insideAsync.includes('})') && insideAsync.length > 200,
+    'the async task statement must be captured in full, not clipped');
   assert.match(beforeAsync, /currentInitiator\?\.\(\)/,
     'the initiator must be captured synchronously, while it still refers to THIS session');
   assert.ok(!/currentInitiator\?\.\(\)/.test(insideAsync),

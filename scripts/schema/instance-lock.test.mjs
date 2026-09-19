@@ -16,6 +16,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { InstanceLock } from '../../lib/op-runtime.js';
+import { enclosingBlock } from './source-scope.mjs';
 
 function ws() {
   return mkdtempSync(join(tmpdir(), 'dsh-lock-'));
@@ -142,10 +143,21 @@ test('index.js gates tidy and prune on lock ownership', () => {
 
   const execStart = src.indexOf('async function execute(planDigest');
   assert.ok(execStart > 0);
-  const execBlock = src.slice(execStart, execStart + 1200);
+  // This was `src.slice(execStart, execStart + 1200)`, and it was the most fragile
+  // window in the repo: 122 characters of headroom, measured. Adding 126 characters
+  // of comment cut `lookupAndClaim` off the end, so `indexOf` returned -1 and the
+  // ordering assertion below became `740 < -1` -- permanently RED on a change with
+  // no behaviour difference, and permanently GREEN had the comparison been written
+  // the other way round. A scope cannot clip either landmark.
+  const execBlock = enclosingBlock(src, execStart);
   assert.match(execBlock, /mutationsAllowed/,
     'prune execute must refuse when another instance owns the workspace');
-  assert.ok(execBlock.indexOf('mutationsAllowed') < execBlock.indexOf('lookupAndClaim'),
+  const refusalAt = execBlock.indexOf('mutationsAllowed');
+  const claimAt = execBlock.indexOf('lookupAndClaim');
+  assert.ok(refusalAt > -1 && claimAt > -1,
+    'both landmarks must be inside the execute function, or this ordering check is '
+    + 'comparing against -1 instead of comparing positions');
+  assert.ok(refusalAt < claimAt,
     'the refusal must happen before the plan is claimed, or the digest is burned '
     + 'and cannot be retried once the owning instance goes away');
 

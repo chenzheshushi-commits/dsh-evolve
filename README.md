@@ -221,11 +221,10 @@ Measured: the snapshot defect goes red, assigning onto a copy goes red, revertin
 store to a constructor snapshot fails three assertions, and the equivalent refactor
 (per-key assignment instead of `Object.assign`) stays green.
 
-Known and tracked for the next release: `reconcile()` still projects `durability` away
-before it leaves `op-runtime.js`, and on Windows `fsyncTree` discards directory-level
-refusals so the field is never written at all; two guards still judge adjacency with
-fixed character windows and will fail correct code; the `publish-protocols.js` comment
-still says nothing reads a durability field.
+All four of those debts are paid in v0.7.0: `reconcile()` forwards `durability` and
+`unflushed` into its report, `fsyncTree` reports the outcome of every directory flush,
+no gate in `scripts/schema/` judges adjacency by character count any more, and the
+`publish-protocols.js` comment now describes what the code does.
 
 ---
 

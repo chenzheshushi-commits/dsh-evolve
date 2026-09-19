@@ -88,20 +88,19 @@ test('defaults are still applied for keys the host never set', async () => {
   }
 });
 
-/**
- * Back-filling defaults into the caller's object is the mechanism that makes the
- * above work without touching all 16 `this.config.*` reads. Pin it, so nobody
- * "cleans it up" back into a spread.
+/*
+ * A text gate on store.js's constructor used to live here, pinning
+ * `this.config = live` inside a 1600-character window. It was removed in v0.7.0:
+ * three changes with zero behaviour difference each turned it red on their own
+ * (renaming `live`, inlining the intermediate variable, and adding 1784 characters
+ * of comment above it -- `this.config = live` sits +918 into the constructor, so
+ * ordinary comments push it out of the window). Its red said nothing about whether
+ * the store still shares the host's object.
+ *
+ * What it claimed to protect is covered by behaviour instead: the e2e below drives
+ * the real route and reads the real store, and goes red when the snapshot bug is
+ * reintroduced (verified by injecting `this.config = { ...live }`: 2 of 3 tests fail).
  */
-test('the store does not copy the config object', () => {
-  const text = readFileSync(new URL('../../lib/store.js', import.meta.url), 'utf8');
-  const ctor = text.slice(text.indexOf('constructor(table'), text.indexOf('constructor(table') + 1600);
-  assert.equal(/this\.config\s*=\s*\{\s*\.\.\./.test(ctor), false,
-    'spreading into this.config recreates the snapshot bug: setConfig mutates the '
-    + 'original object, so a copy can never see later changes');
-  assert.match(ctor, /this\.config\s*=\s*live/,
-    'the store must hold the host\'s own config object');
-});
 
 /**
  * End-to-end: drive the REAL web route the settings page calls, then read the REAL
@@ -163,9 +162,18 @@ test('POST set-config reaches the live store (end to end)', async () => {
     };
 
     const mod = await import('../../lib/index.js');
-    // apply()'s second argument IS the config object the whole plugin shares:
-    // getConfig returns it, setConfig mutates it, MemoryStore is meant to hold it.
-    const hostConfig = { maxPendingQueue: 50, disposalMinIdleDays: 30 };
+    // apply()'s second argument is NOT the object the plugin goes on to share.
+    // lib/index.js:212 does `const cfg = { ...MEMORY_DEFAULTS, ...SKILL_DEFAULTS,
+    // ...config }`, so what we pass in here is spread into a NEW object immediately.
+    // `cfg` is the shared one: getConfig returns it, setConfig does Object.assign on
+    // it, and `new MemoryStore({ ..., config: cfg })` hands it to the store. Asserting
+    // against this object would therefore prove nothing about liveness -- the earlier
+    // comment claimed the opposite and made this test look stronger than it was.
+    //
+    // Values are deliberately NOT the defaults (50/30). With defaults, "the host's
+    // initial value arrived" and "the default was applied" are the same observation,
+    // so the e2e below could not tell them apart.
+    const hostConfig = { maxPendingQueue: 3, disposalMinIdleDays: 17 };
     await mod.apply(ctx, hostConfig);
 
     const routeFor = (path) => {
@@ -201,6 +209,16 @@ test('POST set-config reaches the live store (end to end)', async () => {
       return { status, payload };
     };
     const post = (body) => call(action, body);
+
+    // Before touching anything: the value the HOST passed to apply() must be what the
+    // plugin is running on. This is why hostConfig above uses 3/17 instead of the
+    // defaults -- with 50/30 this assertion would also pass when the host's object was
+    // ignored entirely and MEMORY_DEFAULTS filled in the same numbers.
+    const initial = await call(state);
+    assert.equal(initial.payload?.config?.maxPendingQueue, 3,
+      "the host's initial maxPendingQueue must reach the plugin, not be replaced by the default");
+    assert.equal(initial.payload?.config?.disposalMinIdleDays, 17,
+      "the host's initial disposalMinIdleDays must reach the plugin too");
 
     const before = await post({ action: 'set-config', maxPendingQueue: 10 });
     assert.equal(before.status, 200,
@@ -240,9 +258,14 @@ test('POST set-config reaches the live store (end to end)', async () => {
 
     const remember = registeredTools.get('memory_remember');
     assert.ok(remember, 'the plugin must register memory_remember (the store-side probe)');
+    // The second argument is the exec context. `confirm` used to be passed here as
+    // though the tool might ask for approval; `grep -rn 'exec.confirm' lib/` finds
+    // nothing -- memory_remember reads only exec.agent / exec.callId / exec.signal.
+    // An empty object is the honest shape, and it keeps this probe from implying a
+    // confirmation path that does not exist.
     const write = (content) => remember.execute(
       { content, kind: 'note', importance: 1, scope: 'project' },
-      { confirm: async () => false },
+      {},
     );
 
     const first = await write('the office kettle lives on the third shelf by the window');

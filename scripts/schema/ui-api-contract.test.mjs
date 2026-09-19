@@ -16,6 +16,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
+import { enclosingStatement, splitCallArgs } from './source-scope.mjs';
+
 const client = readFileSync(new URL('../../lib/client.js', import.meta.url), 'utf8');
 const routes = readFileSync(new URL('../../lib/web-routes.js', import.meta.url), 'utf8');
 const caps = readFileSync(new URL('../../lib/capabilities.js', import.meta.url), 'utf8');
@@ -94,18 +96,35 @@ test('resolution sends back the conflict hash it displayed', () => {
     'the minted capability target must include observedConflictHash, since the '
     + 'server rebuilds the digest from it and would otherwise never match');
   assert.match(mintWindow, /resolvesOpId/, 'and it must bind the operation it resolves');
-  // The POST body must carry it too, since the service re-checks the view.
-  const bodyWindow = client.slice(postIdx, postIdx + 400);
-  assert.match(bodyWindow, /observedConflictHash/,
+  // The POST body must carry it too, since the service re-checks the view. Read the
+  // whole apiPost statement rather than 400 characters of it: the body is an object
+  // literal whose length changes whenever a field is added.
+  const bodyStatement = enclosingStatement(client, postIdx);
+  assert.match(bodyStatement, /observedConflictHash/,
     'the request body must echo the hash the operator saw');
 });
 
 test('the rollback button proposes rather than rolls back', () => {
   const idx = client.indexOf('rollback-proposal-create');
   assert.ok(idx > 0, 'the client must mint the proposal-create purpose');
-  const window = client.slice(idx, idx + 500);
-  assert.match(window, /rollback-proposal/,
-    'it must POST to the rollback-proposal endpoint');
+
+  // This assertion used to read `client.slice(idx, idx + 500)` and match
+  // /rollback-proposal/ in it. `idx` is where the string
+  // 'rollback-proposal-create' starts, and /rollback-proposal/ is a prefix of it --
+  // so the window matched before it contained anything else. It was TRUE BY
+  // CONSTRUCTION: changing the POST target to ${API}/skills/nope-not-here left this
+  // test green while two others went red.
+  //
+  // What the test name claims is that the button POSTs to the proposal endpoint, so
+  // assert on the POST itself: find the apiPost call and read its first argument.
+  const postIdx = client.indexOf('apiPost(', idx);
+  assert.ok(postIdx > idx,
+    'the minted purpose must be followed by the apiPost it authorises');
+  const { args } = splitCallArgs(client, postIdx + 'apiPost('.length);
+  assert.match(args[0], /\/skills\/rollback-proposal[`'"]/,
+    'the rollback button must POST to the rollback-proposal endpoint; the URL is the '
+    + 'first argument of that apiPost call');
+
   // There is no direct rollback endpoint at all; make sure the client did not
   // invent one.
   assert.equal(/\/skills\/rollback["'`]/.test(client), false,
@@ -118,7 +137,12 @@ test('every privileged client action sends an opId', () => {
   for (const marker of ['skills/restore', 'skills/rollback-proposal']) {
     const idx = client.indexOf(marker);
     assert.ok(idx > 0, `${marker} must be called`);
-    const window = client.slice(Math.max(0, idx - 200), idx + 400);
-    assert.match(window, /opId/, `${marker} must send an opId`);
+    // A 600-character window around the marker had 273 characters of headroom: five
+    // lines of ordinary comment turned this red. The opId belongs to the same call,
+    // so bound the search by that call instead.
+    const callIdx = client.lastIndexOf('apiPost(', idx);
+    assert.ok(callIdx > -1, `${marker} must be reached through apiPost`);
+    const statement = enclosingStatement(client, callIdx);
+    assert.match(statement, /opId/, `${marker} must send an opId`);
   }
 });
