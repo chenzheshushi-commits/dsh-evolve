@@ -70,3 +70,28 @@ jobs:
       # test:baseline needs a real ~/.dsh/storages/evolve_memory.json and is
       # deliberately excluded: a synthetic corpus would report recall numbers that
       # mean nothing. It stays a local pre-release step.
+
+  # The debt scanners are a separate job so their failure reads as "a gate has
+  # decayed" rather than "a test broke" -- they check the SHAPE of this repo's own
+  # gates, not product behaviour.
+  #
+  # Linux only, on purpose: all three read source text and compare repo-relative
+  # paths, so a second OS would re-run identical string work. The verify job above is
+  # where platform differences matter.
+  debt-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+
+      # Each scanner exits non-zero on a finding, a scope-sentinel mismatch, or a
+      # self-check fixture that stopped being flagged. That last one is the important
+      # case: without it an empty finding list is indistinguishable from a scanner
+      # that has silently stopped looking.
+      - run: pnpm run scan:no-verdict
+      - run: pnpm run scan:window
+      - run: pnpm run scan:tautology
