@@ -95,3 +95,8 @@ jobs:
       - run: pnpm run scan:no-verdict
       - run: pnpm run scan:window
       - run: pnpm run scan:tautology
+
+      # Not a scanner: twelve hardcoded checks that re-measure the numbers quoted in
+      # comments, README and test headers against the real scorer. Its threshold is
+      # "every check green", so it needs no scope or recorded list.
+      - run: pnpm run scan:comments
