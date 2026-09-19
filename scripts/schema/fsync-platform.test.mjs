@@ -467,7 +467,12 @@ test('a degraded publish is both recorded and read back', () => {
   // it by scanning from readMarker() calls, and that exclusion is load-bearing.
   let confirmingReads = 0;
   let stateBlockReads = 0;
-  for (const m of runtime.matchAll(/return \{ verdict: 'roll-forward'/g)) {
+  // Match the VERDICT VALUE, not a key order. `return { verdict: 'roll-forward', ...`
+  // and `return { ...degraded(marker), verdict: 'roll-forward', ...` are the same
+  // object; anchoring on the literal opening made a pure key-order change look like
+  // a deleted roll-forward -- the kind of false positive that teaches people to
+  // ignore a red build. Found by mutation-check.mjs case Y2.
+  for (const m of runtime.matchAll(/return \{[^;]*?verdict: 'roll-forward'/g)) {
     const statement = enclosingStatement(runtime, m.index);
     if (/state block/.test(statement)) { stateBlockReads += 1; continue; }
     confirmingReads += 1;

@@ -19,6 +19,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, unlinkSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // Default to the repository this file now lives in, rather than the absolute scratch
 // path it was written against.
@@ -419,8 +420,12 @@ caseOf({
     + '}\n\n'
     + 'export function removeMarker(dir) {'),
   test: 'fsync-platform.test.mjs',
-  expectRed: false,
-  expect: '预期【仍绿】= 门禁同样是定长窗口：同版刚把 400 换成"作用域"，这条却仍是 500 字符',
+  expectRed: true,
+  expect: '预期【变红】（v0.7.0 起反转）。这条原本是用来暴露 500 字符观察窗的：'
+    + '旧门禁只看 readMarker 之后 500 字符，把 roll-forward 推到窗外它就看不见，所以"仍绿"='
+    + '门禁有洞。L0③ 把该断言改成按【语句】界定 + 钉住"恰好三个 marker-trusting roll-forward"，'
+    + '于是新插入的第四个 roll-forward 会被数出来 → 变红才是正确行为。'
+    + '★ 红的原因必须是计数不符，不是窗口截断。',
 });
 
 // ── Y2. ★ 只改键序、行为完全等价 —— 会不会被误杀 ──
@@ -432,7 +437,9 @@ caseOf({
     "return { ...degraded(marker), verdict: 'roll-forward', reason: 'destination carries this operation marker' };"),
   test: 'fsync-platform.test.mjs',
   expectRed: false,
-  expect: '预期【仍绿】；若变红 = 假阳性：门禁只看 verdict 之后 220 字符里有没有字面量 degraded(',
+  expect: '预期【仍绿】：键序变化行为等价。旧门禁只看 verdict 之后 220 字符里有没有字面量 '
+    + 'degraded(，把 ...degraded(marker) 挪到 verdict 之前就落到窗外 → 误杀。'
+    + 'L0③ 改成按【语句】读整条 return，键序就不再影响判定。',
 });
 
 // ── Z. ★ 计算型写模式被当成违规 —— 会不会误报合法写法 ──
