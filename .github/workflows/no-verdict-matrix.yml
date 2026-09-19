@@ -1,0 +1,49 @@
+name: no-verdict-matrix
+
+# The two mutation matrices, kept OUT of the per-commit workflow on purpose: each one
+# mutates real source files, runs a test suite per case, and restores the tree, which
+# takes far too long for every push.
+#
+# But "not in CI" must not mean "never runs". This project has already been bitten
+# three times by a gate that quietly stopped doing anything -- and a matrix that never
+# runs is green forever, which is indistinguishable from a matrix that passes. So this
+# workflow has BOTH triggers: manual dispatch, and automatically whenever a file it
+# actually judges changes. A dispatch-only workflow is one nobody remembers to press.
+#
+# What they prove, and no unit test can: that each gate goes red for the defect it
+# claims to catch (0 holes) and stays green for behaviour-preserving rewrites
+# (0 false positives).
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'lib/**'
+      - 'scripts/schema/*-scan.mjs'
+      - 'scripts/schema/mutation-check.mjs'
+      - 'scripts/schema/config-guard-mutation-matrix.mjs'
+      - 'scripts/schema/*.test.mjs'
+
+jobs:
+  matrices:
+    runs-on: ubuntu-latest
+    # Each case runs a whole test file; the pair needs room.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      # The matrices mutate tracked files and restore them with `git checkout HEAD --`,
+      # so they need real history rather than a detached shallow tree.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+
+      # Both scripts exit non-zero on a hole (a mutation that should have been caught
+      # and was not) and on a false positive (an equivalent rewrite that went red).
+      - run: pnpm run matrix:no-verdict
+
+      # A matrix that leaves the tree dirty has failed to restore something, which
+      # would silently poison every later step.
+      - name: the tree was restored
+        run: git diff --exit-code

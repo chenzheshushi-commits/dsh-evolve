@@ -51,7 +51,8 @@
     "scan:no-verdict": "node scripts/schema/no-verdict-scan.mjs",
     "scan:window": "node scripts/schema/window-scan.mjs",
     "scan:tautology": "node scripts/schema/tautology-scan.mjs",
-    "scan:comments": "node scripts/schema/comment-claims.mjs"
+    "scan:comments": "node scripts/schema/comment-claims.mjs",
+    "matrix:no-verdict": "node scripts/schema/mutation-check.mjs && node scripts/schema/config-guard-mutation-matrix.mjs"
   },
   "dsh": {
     "bundle": {

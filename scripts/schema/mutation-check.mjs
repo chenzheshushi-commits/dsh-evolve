@@ -451,8 +451,13 @@ caseOf({
     + "const MODE = 'w';\n"
     + 'export function flushTmp(tmp) { const fd = openSync(tmp, MODE); try { fsyncSync(fd); } finally { closeSync(fd); } }\n'),
   test: 'fsync-platform.test.mjs',
-  expectRed: false,
-  expect: "预期【仍绿】；若变红 = 假阳性：本文件自己写明写句柄是合法模式，计算型 mode 却一律上报",
+  expectRed: true,
+  expect: '预期【变红】，且这是**设计如此**，不是假阳性。fsync-platform.test.mjs 自己写着 '
+    + '"A computed mode cannot be judged statically. Treat it as suspicious rather than '
+    + '(silently) compliant" —— openSync(tmp, MODE) 里 MODE 是变量，静态读不出它是 '
+    + "'w' 还是 'r'，而判错成 'r' 会漏掉真正的缺陷。保守上报是刻意取舍："
+    + '代价是这类写法必须显式写成字面量模式，收益是判据没有静态盲区。'
+    + '★ 若要改成不报，必须先给出"如何静态证明计算型 mode 安全"的方法，而不是放宽判据。',
 });
 
 // ══════════════════════════════════════════════════════════════════════════
