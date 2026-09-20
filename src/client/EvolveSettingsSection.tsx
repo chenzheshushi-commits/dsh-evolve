@@ -644,7 +644,12 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
         ) : null}
         {(cfg?.disposalMode === 'suggest' || cfg?.disposalMode === 'tidy') && s?.disposalSuggest ? (
           <div style={{ marginTop: 10 }}>
-            <div style={dim}>冷静期：{cfg?.disposalMinIdleDays ?? 30} 天。空闲时自动重算，{s.disposalSuggest.computedAt ? `上次算于 ${new Date(s.disposalSuggest.computedAt).toLocaleString()}` : '（还未触发，需空闲一段时间）'}</div>
+            <div style={dim}>{t('ui.disposal.coolingLine', {
+              days: cfg?.disposalMinIdleDays ?? 30,
+              computed: s.disposalSuggest.computedAt
+                ? t('ui.disposal.computedAt', { when: new Date(s.disposalSuggest.computedAt).toLocaleString() })
+                : t('ui.disposal.notYetComputed'),
+            })}</div>
             {s.disposalSuggest.candidates.length > 0 ? (
               <table style={{ width: '100%', marginTop: 6, ...mono }}>
                 <tbody>
@@ -667,18 +672,22 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
 
       {/* ── Block 2.5: Controlled prune (v0.4.2) ── */}
       <div style={box}>
-        <b>受控剪枝</b>
-        <div style={dim}>检测自动、处置显式。冷/低价值记忆与冗余技能在这里由你勾选处理，全部可逆（软删/归档，随时恢复）。</div>
+        <b>{t('ui.prune.title')}</b>
+        <div style={dim}>{t('ui.prune.desc')}</div>
 
         {/* budget bar */}
         {prune?.budget?.enabled ? (
           <div style={{ ...mono, marginTop: 8, color: prune.budget.overBudget ? '#dc2626' : undefined }}>
-            字符预算：已用 {prune.budget.used} / 上限 {prune.budget.max}{prune.budget.overBudget ? '（超限）' : ''}
+            {t('ui.prune.budget', {
+              used: prune.budget.used,
+              max: prune.budget.max,
+              over: prune.budget.overBudget ? t('ui.prune.overBudget') : '',
+            })}
           </div>
         ) : null}
 
         {/* memory candidates (checkbox + heat badges) */}
-        <div style={{ marginTop: 10 }}><b style={{ fontSize: 13 }}>待清理记忆</b></div>
+        <div style={{ marginTop: 10 }}><b style={{ fontSize: 13 }}>{t('ui.prune.memTitle')}</b></div>
         {prune && prune.memoryCandidates.length > 0 ? (
           <table style={{ width: '100%', marginTop: 6, ...mono }}>
             <tbody>
@@ -694,8 +703,8 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
                       <div style={{ ...dim, fontSize: 11 }}>
                         {c.pinned ? <span style={{ color: '#f59e0b' }}>PINNED </span> : null}
                         {c.kind ? `[${c.kind}/imp${c.importance}] ` : ''}
-                        {typeof c.heat === 'number' ? `久未主动访问 · heat ${c.heat}` : ''}
-                        {typeof c.injectionCount === 'number' ? ` · 自动注入 ${c.injectionCount} 次` : ''}
+                        {typeof c.heat === 'number' ? t('ui.prune.heat', { heat: c.heat }) : ''}
+                        {typeof c.injectionCount === 'number' ? t('ui.prune.injected', { count: c.injectionCount }) : ''}
                       </div>
                     </td>
                   </tr>
@@ -703,23 +712,23 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
               })}
             </tbody>
           </table>
-        ) : <div style={{ ...dim, marginTop: 6 }}>（无待清理候选）</div>}
+        ) : <div style={{ ...dim, marginTop: 6 }}>{t('ui.prune.noCandidates')}</div>}
 
         {/* preview -> execute two-stage */}
         {prune && prune.memoryCandidates.length > 0 ? (
           <div style={{ marginTop: 10 }}>
             {!preview ? (
-              <button style={btn} disabled={saving} onClick={() => void doPreview()}>预览将处理的记忆</button>
+              <button style={btn} disabled={saving} onClick={() => void doPreview()}>{t('ui.prune.previewBtn')}</button>
             ) : (
               <div style={{ border: '1px dashed var(--dsh-border,#555)', borderRadius: 6, padding: 8 }}>
-                <div style={{ marginBottom: 6, fontWeight: 600 }}>预览（软删，全部可恢复）：</div>
+                <div style={{ marginBottom: 6, fontWeight: 600 }}>{t('ui.prune.previewTitle')}</div>
                 <table style={{ width: '100%', ...mono, borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ ...dim, textAlign: 'left', borderBottom: '1px solid var(--dsh-border,#444)' }}>
-                      <th style={{ padding: '2px 6px' }}>动作</th>
-                      <th style={{ padding: '2px 6px' }}>数量</th>
-                      <th style={{ padding: '2px 6px' }}>结果</th>
-                      <th style={{ padding: '2px 6px' }}>说明</th>
+                      <th style={{ padding: '2px 6px' }}>{t('ui.prune.colAction')}</th>
+                      <th style={{ padding: '2px 6px' }}>{t('ui.prune.colCount')}</th>
+                      <th style={{ padding: '2px 6px' }}>{t('ui.prune.colResult')}</th>
+                      <th style={{ padding: '2px 6px' }}>{t('ui.prune.colNote')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -727,15 +736,15 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
                       <tr key={i} style={{ borderBottom: '1px solid var(--dsh-border,#2a2a2a)' }}>
                         <td style={{ padding: '2px 6px' }}>{p.action}</td>
                         <td style={{ padding: '2px 6px', textAlign: 'right' }}>{p.count}</td>
-                        <td style={{ padding: '2px 6px', color: p.allowed ? '#16a34a' : '#b45309' }}>{p.allowed ? '将执行' : '跳过'}</td>
-                        <td style={{ padding: '2px 6px', ...dim }}>{p.allowed ? '' : p.reason}{p.requires ? `（需 ${p.requires}）` : ''}</td>
+                        <td style={{ padding: '2px 6px', color: p.allowed ? '#16a34a' : '#b45309' }}>{p.allowed ? t('ui.prune.willRun') : t('ui.prune.skipped')}</td>
+                        <td style={{ padding: '2px 6px', ...dim }}>{p.allowed ? '' : p.reason}{p.requires ? t('ui.prune.requires', { what: p.requires }) : ''}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
                 <div style={{ marginTop: 8 }}>
-                  <button style={btnPrimary} disabled={saving} onClick={() => void doExecute()}>确认执行</button>
-                  <button style={btn} disabled={saving} onClick={() => setPreview(null)}>取消</button>
+                  <button style={btnPrimary} disabled={saving} onClick={() => void doExecute()}>{t('ui.prune.confirmBtn')}</button>
+                  <button style={btn} disabled={saving} onClick={() => setPreview(null)}>{t('ui.prune.cancelBtn')}</button>
                 </div>
               </div>
             )}
@@ -745,8 +754,8 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
         {/* protected-kind review area (read-only, no forget) */}
         {prune && prune.protectedReview.length > 0 ? (
           <div style={{ marginTop: 12 }}>
-            <b style={{ fontSize: 13 }}>保护记录（需专项审阅）</b>
-            <div style={dim}>偏好 / 决策类记忆本版本不支持直接处置（避免误删长期偏好）。仅供审阅。</div>
+            <b style={{ fontSize: 13 }}>{t('ui.prune.protectedTitle')}</b>
+            <div style={dim}>{t('ui.prune.protectedDesc')}</div>
             {prune.protectedReview.map((r) => (
               <div key={r.id} style={{ ...mono, paddingLeft: 12, opacity: 0.8 }}>· [{r.kind}] {r.content}</div>
             ))}
@@ -756,24 +765,28 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
         {/* skill merge candidates */}
         {prune && prune.skillCandidates.length > 0 ? (
           <div style={{ marginTop: 12 }}>
-            <b style={{ fontSize: 13 }}>待收敛技能</b>
+            <b style={{ fontSize: 13 }}>{t('ui.prune.convergeTitle')}</b>
             {prune.skillCandidates.map((sc, i) => (
               <div key={i} style={{ ...mono, paddingLeft: 12, opacity: 0.85 }}>
-                · {sc.names.join(' ↔ ')}｜相似度 {sc.similarity}{typeof sc.zeroLoadCount === 'number' ? `｜零加载 ${sc.zeroLoadCount}` : ''}
+                {t('ui.prune.convergeMeta', {
+                  names: sc.names.join(' ↔ '),
+                  similarity: sc.similarity,
+                  zeroLoad: typeof sc.zeroLoadCount === 'number' ? t('ui.prune.zeroLoad', { count: sc.zeroLoadCount }) : '',
+                })}
               </div>
             ))}
-            <div style={{ ...dim, fontSize: 11, marginTop: 4 }}>技能合并/归档请用对话侧 converge_skill / archive_skill（面板暂只做记忆清理）。</div>
+            <div style={{ ...dim, fontSize: 11, marginTop: 4 }}>{t('ui.prune.convergeHint')}</div>
           </div>
         ) : null}
 
         {/* forgotten (recoverable) */}
         {prune && prune.forgotten.length > 0 ? (
           <div style={{ marginTop: 12 }}>
-            <b style={{ fontSize: 13 }}>已忘记（可恢复）</b>
+            <b style={{ fontSize: 13 }}>{t('ui.prune.forgottenTitle')}</b>
             {prune.forgotten.map((r) => (
               <div key={r.id} style={{ ...mono, paddingLeft: 12 }}>
                 <span style={{ opacity: 0.7 }}>· [{r.kind}] {r.content}</span>
-                <button style={{ ...btn, marginLeft: 8, padding: '2px 8px' }} disabled={saving} onClick={() => void doRestore(r.id)}>恢复</button>
+                <button style={{ ...btn, marginLeft: 8, padding: '2px 8px' }} disabled={saving} onClick={() => void doRestore(r.id)}>{t('ui.prune.restoreBtn')}</button>
               </div>
             ))}
           </div>
@@ -782,12 +795,17 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
 
       {/* ── Block 3: Overview ── */}
       <div style={box}>
-        <b>记忆 / skill 概览</b>
+        <b>{t('ui.overview.title')}</b>
         {s ? (
           <div style={{ marginTop: 8, ...mono }}>
-            <div>记忆：共 {s.memoryStats.total}（已确认 {s.memoryStats.confirmed} / 待确认 {s.memoryStats.pending}），上限 {s.memoryStats.maxRecords}</div>
-            <div style={{ marginTop: 4 }}>按类型：{Object.entries(s.memoryStats.byKind).map(([k, v]) => `${k}:${v}`).join('  ') || '—'}</div>
-            <div style={{ marginTop: 4 }}>最常被注入（真正影响决策）：</div>
+            <div>{t('ui.overview.memLine', {
+              total: s.memoryStats.total, confirmed: s.memoryStats.confirmed,
+              pending: s.memoryStats.pending, max: s.memoryStats.maxRecords,
+            })}</div>
+            <div style={{ marginTop: 4 }}>{t('ui.overview.byKind', {
+              kinds: Object.entries(s.memoryStats.byKind).map(([k, v]) => `${k}:${v}`).join('  ') || '—',
+            })}</div>
+            <div style={{ marginTop: 4 }}>{t('ui.overview.mostInjected')}</div>
             {s.memoryStats.topByInjection.length > 0
               ? s.memoryStats.topByInjection.map((r) => (
                 <div key={r.id} style={{ paddingLeft: 12, opacity: 0.85 }}>· ({r.injectionCount}×) {r.content}</div>
@@ -798,26 +816,29 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
             </div>
             {triageOn ? (
               <div style={{ marginTop: 4 }}>
-                结果三元组：{(triage as { totalTurns: number }).totalTurns} 轮记录，成功 {(triage as { successes: number }).successes} / 失败 {(triage as { failures: number }).failures}
+                {t('ui.overview.triage', {
+                  turns: (triage as { totalTurns: number }).totalTurns,
+                  successes: (triage as { successes: number }).successes,
+                  failures: (triage as { failures: number }).failures,
+                })}
               </div>
-            ) : <div style={{ marginTop: 4, opacity: 0.6 }}>结果三元组：未启用</div>}
+            ) : <div style={{ marginTop: 4, opacity: 0.6 }}>{t('ui.overview.triageOff')}</div>}
           </div>
-        ) : <div style={{ ...dim, marginTop: 8 }}>加载中…</div>}
+        ) : <div style={{ ...dim, marginTop: 8 }}>{t('ui.overview.loading')}</div>}
       </div>
 
       {note ? <div style={box}><pre style={mono}>{note}</pre></div> : null}
       {archives.length>0 ? <div style={box}>
-        <b>已归档的 skill（{archives.length}）</b>
+        <b>{t('ui.archives.title', { count: archives.length })}</b>
         <div style={dim}>
-          归档只是移出活动目录，文件都还在，可以随时恢复。同一个 skill 可以有多份归档，
-          按归档编号区分——恢复时挑你要的那一份，不会互相覆盖。
+          {t('ui.archives.desc')}
         </div>
         <table style={{width:'100%',marginTop:8,...mono}}><tbody>{archives.map(a=><tr key={a.archiveId}>
           <td>{a.logicalSkillName}</td>
           <td style={dim}>{a.archiveId}</td>
           <td style={{textAlign:'right',whiteSpace:'nowrap'}}>
-            <button style={btnTiny} disabled={saving} onClick={()=>void restoreArchive(a)}>恢复</button>{' '}
-            <button style={btnTiny} disabled={saving} onClick={()=>void proposeRollback(a.logicalSkillName)}>提议回滚</button>
+            <button style={btnTiny} disabled={saving} onClick={()=>void restoreArchive(a)}>{t('ui.prune.restoreBtn')}</button>{' '}
+            <button style={btnTiny} disabled={saving} onClick={()=>void proposeRollback(a.logicalSkillName)}>{t('ui.archives.proposeRollback')}</button>
           </td>
         </tr>)}</tbody></table>
       </div> : null}

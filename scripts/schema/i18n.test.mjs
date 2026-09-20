@@ -102,6 +102,23 @@ test('an absent host locale falls back to English instead of throwing', () => {
   assert.equal(resolveLanguage('follow-host', { preference: 'de' }), FALLBACK_LANGUAGE);
 });
 
+test('every key the settings page asks for exists', () => {
+  // The gap the other assertions could not see: both tables having the SAME keys says
+  // nothing about whether the keys the UI actually calls are among them. A missing key
+  // renders its own name -- the settings page would show "ui.prune.cancelBtn" where a
+  // button label belongs -- and the suite stayed green through eight of those.
+  const ui = readFileSync(
+    join(repoRoot, 'src', 'client', 'EvolveSettingsSection.tsx'), 'utf8',
+  );
+  const used = [...new Set([...ui.matchAll(/\bt\('([^']+)'/g)].map((m) => m[1]))];
+  assert.ok(used.length > 50, `expected the page to use many keys, found ${used.length}`);
+  const have = new Set(keysOf('en'));
+  const missing = used.filter((k) => !have.has(k));
+  assert.deepEqual(missing, [],
+    'the settings page calls these keys and the table does not define them, so the page '
+    + 'would render the key names themselves');
+});
+
 test('the Chinese search internals were not touched', () => {
   // These are retrieval machinery, not display text. English queries already go
   // through the same BM25 path, and "translating" a stopword list would break Chinese
