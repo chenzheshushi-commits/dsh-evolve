@@ -248,8 +248,11 @@ publish used to be implicit in two error-code tables, so when v0.6.4 put EROFS i
 and not the other, "a read-only object must not abort a publish" inverted for that code
 with nothing able to see it.
 
-378 tests. The retrieval fix ships with a synthetic corpus in `test-fixtures/` so its
-numbers can be reproduced without anyone's private memory store.
+378 tests. The retrieval numbers above were measured against a private 60-record store,
+so the repository also carries a synthetic corpus (`test-fixtures/retrieval-corpus.json`,
+invented records, in the source tree rather than the installed package) that reproduces
+the same failure and the same fix — the precision claim is checkable without anyone
+publishing their own memories.
 
 ### Boundaries
 
