@@ -33,17 +33,29 @@ assert.ok(hits.length === 1 && hits[0].score > 0, 'CJK recall hits');
 assert.equal(search.rankRecords([rec], 'ok了吗', 5, {}).length, 0, 'filler query no hit');
 
 // fuseRRF: a doc found by BOTH retrievers must outrank docs found by only one.
-const rA = mkRec({ id: 'A', content: '反代 504 超时', importance: 2 });
-const rB = mkRec({ id: 'B', content: '客户投诉处理流程', importance: 2 });
-const rC = mkRec({ id: 'C', content: '无关记录', importance: 2 });
+// All three fixtures must share the query's terms: since v0.7.0 an FTS-only hit is
+// re-checked against the scorer, so a record the scorer rejects is not surfaced at all
+// (that check is what closed issue #2 -- BM25 rank alone used to be enough).
+const FUSE_Q = '反代超时';
+const rA = mkRec({ id: 'A', content: '反代超时默认 60 秒会导致 504', importance: 2 });
+const rB = mkRec({ id: 'B', content: '反代超时排查：先看网关日志', importance: 2 });
+const rC = mkRec({ id: 'C', content: '反代超时与服务崩溃的区别', importance: 2 });
 const byId = new Map([[rA.id, rA], [rB.id, rB], [rC.id, rC]]);
 const bigram = [{ record: rA, score: 5 }, { record: rB, score: 3 }]; // A,B
 const ftsIds = ['A', 'C']; // A (both), C (fts-only)
-const fused = search.fuseRRF(bigram, ftsIds, byId, 5);
+const fused = search.fuseRRF(bigram, ftsIds, byId, 5, FUSE_Q);
 assert.equal(fused[0].record.id, 'A', 'RRF: doc present in BOTH retrievers wins over single-list docs');
 assert.ok(fused.some((h) => h.record.id === 'C'), 'RRF: FTS-only doc still surfaced');
 assert.ok(fused.some((h) => h.record.id === 'B'), 'RRF: bigram-only doc still surfaced');
-assert.equal(search.fuseRRF([], [], byId, 5).length, 0, 'RRF: empty in -> empty out');
+assert.equal(search.fuseRRF([], [], byId, 5, FUSE_Q).length, 0, 'RRF: empty in -> empty out');
+// An FTS hit the scorer rejects must NOT be surfaced -- the half of issue #2 that made
+// fixing the score alone change nothing.
+const rZ = mkRec({ id: 'Z', content: '完全无关的记录', importance: 2 });
+byId.set(rZ.id, rZ);
+assert.ok(!search.fuseRRF([], ['Z'], byId, 5, FUSE_Q).some((h) => h.record.id === 'Z'),
+  'RRF: an FTS-only doc scoring 0 must be dropped, not admitted on BM25 rank alone');
+assert.throws(() => search.fuseRRF(bigram, ftsIds, byId, 5), TypeError,
+  'RRF: a missing query must throw rather than silently skip the score check');
 console.log('OK search: CJK hit score=', hits[0].score.toFixed(3), '| filler filtered | RRF both>single + surfaces single-list');
 
 // ── adjudicator: tiered auto-confirm (v0.4.0 direction 1) ────────────────────
@@ -1188,7 +1200,11 @@ function makeStoreTable() {
     });
 
     const textOf = (msg) => { try { return msg.content.map((c) => c.text ?? '').join(''); } catch { return ''; } };
-    const TIER1_MARK = '用户长期偏好/事实';
+    // Taken from the i18n table, not hardcoded: the anchor is language-dependent since
+    // v0.7.0, and this harness has no host locale so the plugin emits English. Reading
+    // the same key the injector uses means this test cannot drift from the code.
+    const { t } = await import('./lib/i18n.js');
+    const TIER1_MARK = t('en', 'anchor.preferences.reference');
     const mkSess = (n) => { const injected = []; const agent = { id: `s${n}`, inject: (m) => injected.push(m) }; agent.session = { id: `s${n}`, agent }; return { session: agent.session, injected }; };
     const turnStart = captured['session/event'] ?? [];
     const fire = (sess, turn) => { for (const h of turnStart) { try { h(sess.session, { type: 'turn/start', data: { turn } }); } catch { /* not all session/event handlers handle turn/start */ } } };
