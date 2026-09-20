@@ -1,0 +1,130 @@
+{
+  "_comment": [
+    "Synthetic memories for retrieval tests. Every record here is INVENTED.",
+    "",
+    "No real user memory is in this file, and none will be: a memory store is personal",
+    "content, and 'anonymised' personal content does not belong in a public repository.",
+    "Written by hand instead, which turns out to be better evidence rather than a",
+    "compromise -- the adversarial cases below are CONSTRUCTED to share a word with a",
+    "record they must not recall, whereas in a real store such pairs only exist by luck.",
+    "",
+    "The point of the corpus is issue #2: a query sharing one two-character word with a",
+    "record used to recall it. FRAGMENT was 0.6 and the floor's lower bound is also 0.6,",
+    "so a single shared 2-gram reached the floor unaided.",
+    "",
+    "Shape matches lib/store.js records: importance 1, accessCount 0, and createdAt ==",
+    "updatedAt == BASE_TIME so scoreRecord returns `base` with all three multipliers at 1."
+  ],
+  "baseTime": "2026-08-01T00:00:00.000Z",
+  "records": [
+    {
+      "id": "syn_lang_pref",
+      "content": "用户偏好：使用中文回复，技术术语可保留英文（不强制翻译）。",
+      "kind": "preference",
+      "tags": ["语言", "中文", "回复风格"],
+      "scope": "user",
+      "importance": 1,
+      "_why": "The target of the classic false positive. Tagged 语言, and 回复 appears in the content -- the combination that made every naive corroboration rule fail one way or the other."
+    },
+    {
+      "id": "syn_timeout_cause",
+      "content": "反代超时默认 60 秒会导致 504。",
+      "kind": "lesson",
+      "tags": ["反代", "超时", "504"],
+      "scope": "project",
+      "importance": 1,
+      "_why": "A paraphrase target: the query 反向代理超时 shares no whole word with 反代超时, so it must be found through fragments. Kept SHORT on purpose -- bigram Jaccard is a ratio, so padding a record with a second clause dilutes it below the floor. The first draft of this record was 33 characters and scored 0 where the 16-character version scores 0.7095. That is pre-existing behaviour (a long record is harder for a short query to reach), not something this release changed, but it makes an unrealistically verbose fixture test the dilution rather than the fix."
+    },
+    {
+      "id": "syn_timeout_fix",
+      "content": "解决办法二选一：接口异步化，或调大反代超时。",
+      "kind": "decision",
+      "tags": ["反代", "超时"],
+      "scope": "project",
+      "importance": 1,
+      "_why": "A second genuine hit for the same query, so ranking has something to order."
+    },
+    {
+      "id": "syn_lamp_report",
+      "content": "灯泡光电报告的处理流程走 LM-79 标准，看 CRI 和 R9 两个值。",
+      "kind": "note",
+      "tags": ["灯泡", "光电报告"],
+      "scope": "project",
+      "importance": 1,
+      "_why": "The hardest false positive. It shares 处理/理流/流程 with 这个技能的处理流程是怎样的 and used to score 1.7541 -- ABOVE a real hit's 0.8393 -- so no floor could separate them. It is still recalled; what must hold now is that it ranks below a genuine match."
+    },
+    {
+      "id": "syn_skill_flow",
+      "content": "技能的处理流程是：先结晶成 skill，再按新经验精炼，闲置久了归档。",
+      "kind": "note",
+      "tags": ["skill", "流程"],
+      "scope": "project",
+      "importance": 1,
+      "_why": "The record 这个技能的处理流程是怎样的 SHOULD find, so that query is not purely adversarial: it must outrank the lamp report."
+    },
+    {
+      "id": "syn_backup_cron",
+      "content": "备份定时任务每天凌晨 3 点跑，失败会写 systemd journal 但不发通知。",
+      "kind": "fact",
+      "tags": ["备份", "cron"],
+      "scope": "project",
+      "importance": 1,
+      "_why": "Filler with its own vocabulary: it must never surface for any query below."
+    },
+    {
+      "id": "syn_deploy_order",
+      "content": "部署顺序：先迁移数据库，再切流量，回滚时反过来。",
+      "kind": "decision",
+      "tags": ["部署", "回滚"],
+      "scope": "project",
+      "importance": 1,
+      "_why": "Filler, and shares 回 with 回复语言 at the single-character level -- unigram Jaccard must not be enough on its own."
+    },
+    {
+      "id": "syn_english_note",
+      "content": "The staging environment uses a self-signed certificate, so curl needs -k there.",
+      "kind": "fact",
+      "tags": ["staging", "tls"],
+      "scope": "project",
+      "importance": 1,
+      "_why": "An English record: ASCII word matching must keep working, and it must not be recalled by Chinese queries."
+    }
+  ],
+  "queries": [
+    {
+      "q": "回复语言",
+      "expect": "syn_lang_pref",
+      "_why": "Per-word tag matching exists for this. The old test asked whether the WHOLE query was a substring of one tag, so this scored 0 against tags ['语言','中文','回复风格']."
+    },
+    {
+      "q": "要求用什么语言回复",
+      "expect": "syn_lang_pref",
+      "_why": "Same record, chatty phrasing. Stopword-laden fragments (要求/什么) must not drown it."
+    },
+    {
+      "q": "语言",
+      "expect": "syn_lang_pref",
+      "_why": "The query IS the tag, with nothing left to corroborate. It must still be findable, or tags stop being searchable by name."
+    },
+    {
+      "q": "反向代理超时",
+      "expect": "syn_timeout_cause",
+      "_why": "Paraphrase recall: no whole word is shared with 反代超时."
+    },
+    {
+      "q": "编程语言",
+      "expect": null,
+      "_why": "Issue #2 itself. Shares the word 语言 with syn_lang_pref's tag, and 编程 appears nowhere in it. Must return NOTHING."
+    },
+    {
+      "q": "自然语言",
+      "expect": null,
+      "_why": "The same defect via a different word, so a fix cannot be special-cased to 编程."
+    },
+    {
+      "q": "烤箱预热多少度",
+      "expect": null,
+      "_why": "Entirely unrelated. Anything returned here is pure noise."
+    }
+  ]
+}

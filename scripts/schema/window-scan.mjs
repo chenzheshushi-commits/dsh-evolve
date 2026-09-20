@@ -44,7 +44,7 @@ export const SCOPE_DESCRIPTION = 'scripts/** (recursive)';
  * Candidate count, for the scope sentinel. Re-derive this by running the scanner
  * when files are legitimately added; do not edit it to silence a failure.
  */
-export const CANDIDATE_SENTINEL = 44;
+export const CANDIDATE_SENTINEL = 45;
 
 /**
  * Known windows still awaiting conversion, as repo-relative `path:line`.
