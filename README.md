@@ -39,7 +39,7 @@ dsh plugin --profile web add github:chenzheshushi-commits/dsh-evolve
 Pin a specific release instead of tracking `main`:
 
 ```bash
-dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.6.5/dsh-evolve-0.6.5.tgz"
+dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.7.0/dsh-evolve-0.7.0.tgz"
 ```
 
 Then restart the harness — tools are discovered at startup, not hot-reloaded.
@@ -185,6 +185,98 @@ behavior on failure. Nothing runs in your main loop.
 - **No internal timers.** In-session work hangs off events; offline work is an external cron calling a tool.
 - **Ship blank.** No preloaded personal data. What it learns stays on your machine and is never packaged.
 - **Mechanisms over model smarts.** Safety comes from deterministic rules, so swapping models changes quality, never safety.
+
+---
+
+## What's new in v0.7.0 — Gates that can fail, and English support
+
+Two user-visible fixes, and a structural one underneath them.
+
+**Retrieval precision (issue #2).** A query sharing one two-character word with a
+memory recalled it: 「编程语言」 ("programming language") returned a note about replying
+in Chinese. The cause was arithmetic — fragment credit was 0.6 and the score floor's
+lower bound is also 0.6, so a single coincidental 2-gram reached it unaided. Raising the
+floor could not fix it, because the false positive scored 1.7541 against a real hit's
+0.8393: it outranked the thing you actually wanted.
+
+Four changes, load-bearing together. Tag credit is matched per WORD instead of asking
+whether the whole query is a substring of one tag (the old test scored 0 for 「回复语言」
+against a tag 「语言」 — the queries tags existed to serve were the ones they could not
+serve). Fragment credit is halved so fragments must accumulate. Tag credit now requires
+corroboration: some other word of the query must appear in the record's content.
+And `fuseRRF` re-checks every full-text hit against the scorer — without that last one
+the first three changed nothing, because BM25 rank alone was enough to be recalled.
+Measured on a 60-record store: recall unchanged at 5/5, MRR unchanged at 1.0000, the
+adversarial query down from 5 results to 0.
+
+**English support (issue #1).** Every string was a hardcoded Chinese literal. The part
+that mattered was not cosmetic: the plugin injects a `相关记忆` header and separately
+instructs the model to look for that block, so an English setup received Chinese
+markers. That is a behavioural difference.
+
+Language follows the DSH host locale by default (`ctx.settings.get('locale')`), with an
+explicit `[follow-host | en | zh]` override in the plugin's own settings, so an English
+UI on a Chinese system is possible. English is the default when nothing is detected;
+existing installs migrate to `zh` once so nobody's UI flips on upgrade. The Chinese
+search internals — a 90-entry stopword list and CJK bigram tokenization — are untouched
+and stay that way: they are retrieval machinery, not display text.
+
+**Gates that can actually fail.** The tool this project used to find tautological
+assertions had `process.exit`, `process.exitCode` and a top-level `throw` in zero
+places. It printed its findings and returned success; CI saw green. A gate that cannot
+fail and a gate that guards nothing are indistinguishable from outside.
+
+Three debt scanners now live in the repo, each with a frozen scope, a candidate-count
+sentinel, and a self-check fixture that must always be caught — because "the list is
+empty" and "the scanner stopped looking" are otherwise the same result. Two mutation
+matrices run them: 0 holes, 0 false positives.
+
+Ten fixed-character text windows are gone, replaced by scope-based helpers. They failed
+in both directions: 126 characters of comment made one ordering check compare against
+-1 (permanently red on a behaviour-free change), and a negative assertion silently
+stopped checking past 2000 characters.
+
+**Atomic writes.** `lib/fsync.js` has said since v0.6.0 that `openSync(file, 'w')`
+truncates and must never be used. `writeMarker` did exactly that, on a live file, and
+nothing checked. Two measured consequences of the fixed-name temp file: a planted
+symlink redirected a skill save outside its directory with no error, and two concurrent
+writers left one truncated with no error. Ten sites now share one implementation with a
+random suffix and an exclusive create, and the ban is a test rather than a comment.
+
+**Durability policy** moved up to the publish layer. Which fsync outcome should stop a
+publish used to be implicit in two error-code tables, so when v0.6.4 put EROFS in one
+and not the other, "a read-only object must not abort a publish" inverted for that code
+with nothing able to see it.
+
+378 tests. The retrieval fix ships with a synthetic corpus in `test-fixtures/` so its
+numbers can be reproduced without anyone's private memory store.
+
+### Boundaries
+
+Unchanged from v0.6.x, and still the behaviour you will actually hit: one process holds
+an **instance lock** on the evolve workspace. A second process sharing it is not
+blocked from reading, but its automatic work stands down — background tidy degrades to
+suggest-only rather than soft-deleting behind the holder's back, and controlled pruning
+refuses outright. Manual tools stay available in both. This is why automatic work can
+appear to do nothing while the UI is otherwise healthy.
+
+### New configuration
+
+| Key | Default | Effect |
+|---|---:|---|
+| `language` | `follow-host` | `follow-host`, `en`, or `zh`. Follows the DSH host locale unless overridden |
+
+Everything configurable in v0.6.x still applies unchanged:
+
+| Key | Default | Effect |
+|---|---:|---|
+| `disposalMode` | `manual` | `manual`, `suggest`, or recoverable `tidy` |
+| `tidyMaxPerRun` | `5` | Maximum automatic soft-deletes per idle run |
+| `idleMinutes` | `5` | Idle delay for suggest/tidy |
+| `skillProposalMode` | `inherit` | Follow memory approval mode or explicitly select a skill mode |
+| `skillAutoMaxChars` / `skillMaxChars` | `10000` / `40000` | Automatic/human skill-body limits |
+| `approvalPromptEnabled` | `false` | Ask in-turn for direct high-value memory writes |
+| `approvalPromptMaxPerTurn` | `1` | Popup budget per session turn |
 
 ---
 
