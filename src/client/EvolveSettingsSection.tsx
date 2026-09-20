@@ -15,6 +15,11 @@
 
 import { useCallback, useEffect, useState } from 'react'
 
+// The SAME table the host uses (lib/i18n.js). Not external in tsdown.config.ts, so it
+// is bundled into lib/client.js -- one table, so the page and the injected prompt
+// anchors can never disagree about a language.
+import { t as translate, FALLBACK_LANGUAGE } from '../../lib/i18n.js'
+
 const API = '/api/evolve'
 
 interface ModelRow { provider: string; model: string }
@@ -45,6 +50,8 @@ interface PruneState {
 }
 interface EvolveState {
   ok: boolean
+  /** Resolved by the HOST (host locale + this plugin's override). See lib/i18n.js. */
+  language?: string
   config: {
     refineLLM: boolean; refineProvider: string; refineModel: string; tier1Enabled: boolean
     approvalMode: 'manual' | 'balanced' | 'autonomous'
@@ -126,6 +133,16 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
   const [note, setNote] = useState<string>('')
   const [saving, setSaving] = useState(false)
 
+  // Language comes from /state, resolved once on the host. Before the first poll
+  // lands there is no answer yet, so fall back rather than guessing from the browser:
+  // a page that briefly renders the wrong language then switches is worse than one
+  // that starts in English.
+  const lang = state?.language ?? FALLBACK_LANGUAGE
+  const t = useCallback(
+    (key: string, vars?: Record<string, unknown>) => translate(lang, key, vars),
+    [lang],
+  )
+
   const refresh = useCallback(async () => {
     try { setState(await apiGet<EvolveState>(`${API}/state`)) } catch (e) { setNote(String(e)) }
   }, [])
@@ -148,10 +165,10 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
     setSaving(true); setNote('')
     try {
       const r = await apiPost<{ confirmed: number }>(`${API}/action`, { action: 'confirm-batch' })
-      setNote(`✅ 已批量确认 ${r.confirmed} 条 pending 记忆`)
+      setNote(t('ui.note.batchConfirmed', { count: r.confirmed }))
       await refresh()
     } catch (e) { setNote(String(e)) } finally { setSaving(false) }
-  }, [refresh])
+  }, [refresh, t])
 
   // U1: the discard channel. Without it the queue could only grow -- a wrongly
   // captured memory could be confirmed or ignored, nothing else -- and once it
@@ -161,35 +178,35 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
     try {
       const cap=await apiPost<{capId:string}>(`${API}/capability/mint`,{purpose:'memory-discard',target:{ids:[id]}})
       const r = await apiPost<{ rejected: number }>(`${API}/memory/discard`, { ids: [id], capId:cap.capId, opId:`discard_${Date.now().toString(36)}` })
-      setNote(r.rejected > 0 ? '🗑️ 已丢弃（可在下方「已拒绝」区恢复）' : '未找到该记忆')
+      setNote(r.rejected > 0 ? t('ui.note.discarded') : t('ui.note.memoryNotFound'))
       await refresh()
     } catch (e) { setNote(String(e)) } finally { setSaving(false) }
-  }, [refresh])
+  }, [refresh, t])
 
   const restoreOne = useCallback(async (id: string) => {
     setSaving(true); setNote('')
     try {
       const cap=await apiPost<{capId:string}>(`${API}/capability/mint`,{purpose:'memory-restore-rejected',target:{ids:[id]}})
       const r = await apiPost<{ restored: number }>(`${API}/memory/restore-rejected`, { ids: [id], capId:cap.capId, opId:`restore_${Date.now().toString(36)}` })
-      setNote(r.restored > 0 ? '↩️ 已恢复为待确认' : '未找到该记忆')
+      setNote(r.restored > 0 ? t('ui.note.restoredToPending') : t('ui.note.memoryNotFound'))
       await refresh()
     } catch (e) { setNote(String(e)) } finally { setSaving(false) }
-  }, [refresh])
+  }, [refresh, t])
 
   const claimSkills = useCallback(async (names: string[]) => {
     setSaving(true); setNote('')
     try {
       const r = await apiPost<{ claimed: number }>(`${API}/action`, { action: 'claim-legacy-skills', names })
-      setNote(r.claimed > 0 ? `✅ 已认领 ${r.claimed} 个 skill，此后可进入自动路径` : '没有可认领的 skill')
+      setNote(r.claimed > 0 ? t('ui.note.claimed', { count: r.claimed }) : t('ui.note.nothingToClaim'))
       await refresh()
     } catch (e) { setNote(String(e)) } finally { setSaving(false) }
-  }, [refresh])
+  }, [refresh, t])
 
   const proposalAction = useCallback(async (id:string, action:'apply'|'reject') => {
     setSaving(true); setNote('')
-    try { const cap=await apiPost<{capId:string}>(`${API}/capability/mint`, {purpose:`proposal-${action}`,target:{proposalId:id}}); const r=await apiPost<{status:string;reason?:string}>(`${API}/proposals/${id}/${action}`, {opId:`${action}_${Date.now().toString(36)}`,capId:cap.capId}); setNote(r.reason?`${r.status}: ${r.reason}`:`✅ 提案 ${r.status}`); await refresh() }
+    try { const cap=await apiPost<{capId:string}>(`${API}/capability/mint`, {purpose:`proposal-${action}`,target:{proposalId:id}}); const r=await apiPost<{status:string;reason?:string}>(`${API}/proposals/${id}/${action}`, {opId:`${action}_${Date.now().toString(36)}`,capId:cap.capId}); setNote(r.reason?`${r.status}: ${r.reason}`:t('ui.note.proposalDone', { status: r.status })); await refresh() }
     catch(e){setNote(String(e))} finally{setSaving(false)}
-  },[refresh])
+  },[refresh, t])
 
   // ── v0.4.2 controlled prune ──
   const [frozenOps, setFrozenOps] = useState<FrozenOperation[]>([])
@@ -227,11 +244,13 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
         `${API}/operations/${op.opId}/resolve`,
         { decision, resolvedKind: op.kind, observedConflictHash: op.observedConflictHash, capId: cap.capId },
       )
-      setNote(r.reason ? `${r.status}: ${r.reason}` : `✅ 操作 ${op.opId} 已${decision === 'ROLL_FORWARD' ? '前滚' : '回滚'}`)
+      setNote(r.reason
+        ? `${r.status}: ${r.reason}`
+        : t(decision === 'ROLL_FORWARD' ? 'ui.note.opRolledForward' : 'ui.note.opRolledBack', { opId: op.opId }))
       await loadOperations()
     } catch (e) { setNote(`❌ ${(e as Error).message}`) }
     finally { setSaving(false) }
-  }, [loadOperations])
+  }, [loadOperations, t])
   const restoreArchive = useCallback(async (a: SkillArchive) => {
     setSaving(true)
     try {
@@ -243,11 +262,13 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
         `${API}/skills/restore`,
         { archiveId: a.archiveId, logicalSkillName: a.logicalSkillName, capId: cap.capId, opId: `restore_${Date.now().toString(36)}` },
       )
-      setNote(r.reason ? `${r.status}: ${r.reason}` : `♻️ 已恢复 skill「${r.name ?? a.logicalSkillName}」`)
+      setNote(r.reason
+        ? `${r.status}: ${r.reason}`
+        : t('ui.note.skillRestored', { name: r.name ?? a.logicalSkillName }))
       await loadArchives()
     } catch (e) { setNote(`❌ ${(e as Error).message}`) }
     finally { setSaving(false) }
-  }, [loadArchives])
+  }, [loadArchives, t])
   const proposeRollback = useCallback(async (name: string) => {
     setSaving(true)
     try {
@@ -260,11 +281,13 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
       )
       // Deliberately a proposal, never a rollback: extracting over a live
       // directory has to be reviewed before it runs.
-      setNote(r.reason ? `${r.status}: ${r.reason}` : `⏮️ 已生成回滚提案 ${r.proposalId}，请在上方提案列表审阅后应用`)
+      setNote(r.reason
+        ? `${r.status}: ${r.reason}`
+        : t('ui.note.rollbackProposalCreated', { id: r.proposalId }))
       await refresh()
     } catch (e) { setNote(`❌ ${(e as Error).message}`) }
     finally { setSaving(false) }
-  }, [])
+  }, [refresh, t])
   const [prune, setPrune] = useState<PruneState | null>(null)
   const [selMem, setSelMem] = useState<Record<string, boolean>>({})
   const [preview, setPreview] = useState<{ planDigest: string; preview: Array<{ action: string; count: number; allowed: boolean; reason: string; requires?: string }> } | null>(null)
@@ -285,13 +308,13 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
   const doPreview = useCallback(async () => {
     if (!prune) return
     const ids = prune.memoryCandidates.filter((c) => selMem[c.id] && c.allowedActions.includes('memory-forget')).map((c) => c.id)
-    if (ids.length === 0) { setNote('未选择可处理的记忆'); return }
+    if (ids.length === 0) { setNote(t('ui.note.noSelectableMemories')); return }
     setSaving(true); setNote('')
     try {
       const r = await apiPost<typeof preview>(`${API}/prune/preview`, { selection: { decisions: [{ action: 'memory-forget', entityType: 'memory', memoryIds: ids, reason: 'panel prune' }] } })
       setPreview(r)
     } catch (e) { setNote(String(e)) } finally { setSaving(false) }
-  }, [prune, selMem])
+  }, [prune, selMem, t])
 
   // Stage 2: execute the previewed plan (idempotent via planDigest).
   const doExecute = useCallback(async () => {
@@ -299,12 +322,20 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
     setSaving(true); setNote('')
     try {
       const r = await apiPost<{ status: string; applied?: unknown[]; skipped?: Array<{ target: string; reason: string }> }>(`${API}/prune/execute`, { planDigest: preview.planDigest })
-      if (r.status === 'plan-expired') setNote('计划已过期，请重新预览')
-      else setNote(`✅ 处理完成：软删 ${r.applied?.length ?? 0} 条${(r.skipped?.length ?? 0) > 0 ? `，跳过 ${r.skipped!.length} 条（${r.skipped!.map((s) => `${s.target}:${s.reason}`).join('; ')}）` : ''}`)
+      if (r.status === 'plan-expired') setNote(t('ui.note.planExpired'))
+      else {
+        const skipped = (r.skipped?.length ?? 0) > 0
+          ? t('ui.note.pruneSkippedSuffix', {
+            count: r.skipped!.length,
+            details: r.skipped!.map((s) => `${s.target}:${s.reason}`).join('; '),
+          })
+          : ''
+        setNote(t('ui.note.pruneDone', { count: r.applied?.length ?? 0, skipped }))
+      }
       setPreview(null); setSelMem({})
       await refreshPrune(); await refresh()
     } catch (e) { setNote(String(e)) } finally { setSaving(false) }
-  }, [preview, refreshPrune, refresh])
+  }, [preview, refreshPrune, refresh, t])
 
   const doRestore = useCallback(async (id: string) => {
     setSaving(true); setNote('')
@@ -312,10 +343,10 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
       const r = await apiPost<typeof preview>(`${API}/prune/preview`, { selection: { decisions: [{ action: 'memory-restore', entityType: 'memory', memoryIds: [id], reason: 'restore' }] } })
       // restore goes straight through (reversible, low-risk) — reuse execute
       if (r?.planDigest) await apiPost(`${API}/prune/execute`, { planDigest: r.planDigest })
-      setNote('✅ 已恢复')
+      setNote(t('ui.note.restored'))
       await refreshPrune(); await refresh()
     } catch (e) { setNote(String(e)) } finally { setSaving(false) }
-  }, [refreshPrune, refresh])
+  }, [refreshPrune, refresh, t])
 
   const s = state
   const cfg = s?.config
@@ -328,11 +359,11 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
   return (
     <div>
       <h2 style={{ marginTop: 0 }}>dsh-evolve</h2>
-      <p style={dim}>自进化记忆 + skill 生命周期。所有设置即时保存到插件配置；数据每 8 秒刷新。</p>
+      <p style={dim}>{t('ui.page.subtitle')}</p>
 
       {/* ── Block 1: LLM refinement ── */}
       <div style={box}>
-        <b>LLM 精炼 skill 内容</b>
+        <b>{t('ui.llm.title')}</b>
         <div style={{ marginTop: 8 }}>
           <label style={{ cursor: 'pointer' }}>
             <input
@@ -341,15 +372,15 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
               disabled={saving || !cfg}
               onChange={(e) => void setConfig({ refineLLM: e.target.checked })}
             />{' '}
-            启用 LLM 精炼
+            {t('ui.llm.enable')}
           </label>
         </div>
         <div style={{ ...dim, marginTop: 6 }}>
-          <div><b>打开</b>：结晶 / 精炼 skill 时，调用一次下方所选模型，把零散记忆提炼成结构化 SKILL.md（去重、分节、写成步骤/坑）。单次调用、仅在结晶/精炼时触发（一次会话可能 0 次），复用 provider 缓存。</div>
-          <div style={{ marginTop: 4 }}><b>关闭</b>：改用确定性拼接（原样把记忆条目列进 SKILL.md），<b>零 token</b>、不调用任何模型。功能完全可用，只是内容不经提炼。</div>
+          <div><b>{t('ui.llm.onLabel')}</b>{t('ui.llm.onDesc')}</div>
+          <div style={{ marginTop: 4 }}><b>{t('ui.llm.offLabel')}</b>{t('ui.llm.offDesc1')}<b>{t('ui.llm.offZeroToken')}</b>{t('ui.llm.offDesc2')}</div>
         </div>
         <div style={{ marginTop: 10 }}>
-          <div style={dim}>精炼使用的模型：</div>
+          <div style={dim}>{t('ui.llm.modelLabel')}</div>
           <select
             style={{ marginTop: 4, minWidth: 320, padding: 4 }}
             value={currentModelKey}
@@ -360,7 +391,7 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
               else { const [provider, model] = v.split('\u0000'); void setConfig({ refineProvider: provider, refineModel: model }) }
             }}
           >
-            <option value="">（跟随 DSH 当前主模型 — 默认）</option>
+            <option value="">{t('ui.llm.followMain')}</option>
             {(s?.models ?? []).map((m) => (
               <option key={`${m.provider}\u0000${m.model}`} value={`${m.provider}\u0000${m.model}`}>
                 {m.provider} / {m.model}
@@ -368,20 +399,20 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
             ))}
           </select>
           <div style={{ ...dim, marginTop: 4 }}>
-            不选 = 跟随主模型（主模型换了它自动跟随）。选了则固定用该模型精炼。
+            {t('ui.llm.modelHint')}
           </div>
         </div>
       </div>
 
       {/* ── Block 1.5: 摄入自治程度 (v0.5.0 direction 1) ── */}
       <div style={box}>
-        <b>记忆摄入自治程度</b>
-        <div style={dim}>决定「模型/后台评审想记的东西」有多少能自动生效，多少要你先过目。切档只影响之后的新记忆，不会批量放行已有的待确认项。</div>
+        <b>{t('ui.ingest.title')}</b>
+        <div style={dim}>{t('ui.ingest.desc')}</div>
         <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {([
-            ['manual', '手动', '全部先进待确认，你逐条确认后才生效。最保守。'],
-            ['balanced', '平衡（默认）', '拿得准的（锚定你原话、或与已确认高度重复）自动生效；拿不准的进待确认。'],
-            ['autonomous', '自治', '凡是可逆、不冲突的都自动生效；重要(imp3)/冲突项仍强制进待确认。写入量另有上限保护。'],
+            ['manual', t('ui.ingest.manualLabel'), t('ui.ingest.manualDesc')],
+            ['balanced', t('ui.ingest.balancedLabel'), t('ui.ingest.balancedDesc')],
+            ['autonomous', t('ui.ingest.autonomousLabel'), t('ui.ingest.autonomousDesc')],
           ] as const).map(([mode, label, desc]) => {
             const active = (cfg?.approvalMode ?? 'balanced') === mode
             return (
