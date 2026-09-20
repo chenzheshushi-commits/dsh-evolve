@@ -430,29 +430,28 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
         </div>
         {cfg?.approvalMode === 'autonomous' && (
           <div style={{ ...dim, marginTop: 8, color: 'var(--dsh-warn, #b45309)' }}>
-            ⚠️ 自治档下后台评审会自动写入更多记忆。每轮最多自动确认 {cfg?.reviewMaxAutoPerTurn ?? 5} 条，待确认队列上限 {cfg?.maxPendingQueue ?? 50} 条——超出的会被拒收以防无界增长。冲突和重要记忆仍需你确认。
+            {t('ui.ingest.autonomousWarn', { perTurn: cfg?.reviewMaxAutoPerTurn ?? 5, queueMax: cfg?.maxPendingQueue ?? 50 })}
           </div>
         )}
       </div>
 
       <div style={box}>
-        <b>Skill 写入审批</b>
-        <div style={dim}>默认跟随摄入档：手动/平衡档先生成提案，只有自主档可直写。要恢复旧式直写可显式选“自主”。</div>
+        <b>{t('ui.skillApproval.title')}</b>
+        <div style={dim}>{t('ui.skillApproval.desc')}</div>
         <select value={cfg?.skillProposalMode ?? 'inherit'} disabled={saving||!cfg} onChange={(e)=>void setConfig({skillProposalMode:e.target.value})} style={{marginTop:8,padding:6}}>
-          <option value="inherit">跟随摄入档（当前：{cfg?.approvalMode ?? 'balanced'}）</option><option value="manual">手动：全部提案</option><option value="balanced">平衡：全部提案</option><option value="autonomous">自主：过安全闸后直写</option>
+          <option value="inherit">{t('ui.skillApproval.inherit', { mode: cfg?.approvalMode ?? 'balanced' })}</option><option value="manual">{t('ui.skillApproval.manual')}</option><option value="balanced">{t('ui.skillApproval.balanced')}</option><option value="autonomous">{t('ui.skillApproval.autonomous')}</option>
         </select>
         <div style={{marginTop:8,fontSize:12}}>
-          人工正文上限 <input type="number" min={1000} max={500000} value={cfg?.skillMaxChars ?? 40000} disabled={saving} onChange={e=>void setConfig({skillMaxChars:Number(e.target.value)})} style={{width:90}} /> 字；
-          自动路径上限 <input type="number" min={1000} max={200000} value={cfg?.skillAutoMaxChars ?? 10000} disabled={saving} onChange={e=>void setConfig({skillAutoMaxChars:Number(e.target.value)})} style={{width:90}} /> 字。
+          {t('ui.skillApproval.manualCharsPrefix')}<input type="number" min={1000} max={500000} value={cfg?.skillMaxChars ?? 40000} disabled={saving} onChange={e=>void setConfig({skillMaxChars:Number(e.target.value)})} style={{width:90}} />{t('ui.skillApproval.manualCharsSuffix')}
+          {t('ui.skillApproval.autoCharsPrefix')}<input type="number" min={1000} max={200000} value={cfg?.skillAutoMaxChars ?? 10000} disabled={saving} onChange={e=>void setConfig({skillAutoMaxChars:Number(e.target.value)})} style={{width:90}} />{t('ui.skillApproval.autoCharsSuffix')}
         </div>
-        <label style={{display:'block',marginTop:10}}><input type="checkbox" checked={cfg?.approvalPromptEnabled ?? false} disabled={saving} onChange={e=>void setConfig({approvalPromptEnabled:e.target.checked})}/> 对话内直接记忆为高价值 pending 时弹一次确认</label>
-        <div style={dim}>仅覆盖开放对话中 memory_remember；后台 review 在 turn 结束后无法弹窗，仍到面板审核。每轮最多 <input type="number" min={0} max={10} value={cfg?.approvalPromptMaxPerTurn ?? 1} disabled={saving} onChange={e=>void setConfig({approvalPromptMaxPerTurn:Number(e.target.value)})} style={{width:48}}/> 次。</div>
+        <label style={{display:'block',marginTop:10}}><input type="checkbox" checked={cfg?.approvalPromptEnabled ?? false} disabled={saving} onChange={e=>void setConfig({approvalPromptEnabled:e.target.checked})}/>{t('ui.skillApproval.promptToggle')}</label>
+        <div style={dim}>{t('ui.skillApproval.promptDescPrefix')}<input type="number" min={0} max={10} value={cfg?.approvalPromptMaxPerTurn ?? 1} disabled={saving} onChange={e=>void setConfig({approvalPromptMaxPerTurn:Number(e.target.value)})} style={{width:48}}/>{t('ui.skillApproval.promptDescSuffix')}</div>
       </div>
       {frozenOps.length>0 ? <div style={{...box, borderColor:'#b45309'}}>
-        <b>⚠️ 卡住的操作（{frozenOps.length}）</b>
+        <b>{t('ui.frozenOps.title', { count: frozenOps.length })}</b>
         <div style={dim}>
-          这些操作没做完就中断了，需要你决定怎么处理。系统不会自己猜——它宁可停下来等人。
-          「前滚」= 认可已经生效的部分并把记账补完；「回滚」= 只在确认从未生效时才可用。
+          {t('ui.frozenOps.desc')}
         </div>
         <table style={{width:'100%',marginTop:8,...mono}}><tbody>{frozenOps.map(op=><tr key={op.opId}>
           <td style={{verticalAlign:'top'}}>{op.kind}</td>
@@ -463,23 +462,23 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
           </td>
           <td style={{textAlign:'right',whiteSpace:'nowrap',verticalAlign:'top'}}>
             {op.resolution?.status==='RESOLVED'
-              ? <span style={dim}>已处理（{op.resolution.decision}）</span>
+              ? <span style={dim}>{t('ui.frozenOps.resolved', { decision: op.resolution.decision })}</span>
               : <>
-                  <button style={btnTiny} disabled={saving} onClick={()=>void resolveOp(op,'ROLL_FORWARD')}>前滚</button>{' '}
-                  <button style={btnTiny} disabled={saving} onClick={()=>void resolveOp(op,'ROLL_BACK')}>回滚</button>
+                  <button style={btnTiny} disabled={saving} onClick={()=>void resolveOp(op,'ROLL_FORWARD')}>{t('ui.op.rollForwardBtn')}</button>{' '}
+                  <button style={btnTiny} disabled={saving} onClick={()=>void resolveOp(op,'ROLL_BACK')}>{t('ui.op.rollBackBtn')}</button>
                 </>}
           </td>
         </tr>)}</tbody></table>
       </div> : null}
       {s?.proposals && s.proposals.length>0 ? <div style={box}>
-        <b>Skill 提案审阅（{s.proposals.length}）</b><div style={dim}>模型只能生成提案，不能自行应用。目标被人改过时会转 stale，不覆盖新内容。</div>
-        <table style={{width:'100%',marginTop:8,...mono}}><tbody>{s.proposals.map(p=><tr key={p.id}><td>{p.action}</td><td>{p.targetSkill}</td><td>{p.state}</td><td style={{textAlign:'right',whiteSpace:'nowrap'}}>{p.state==='pending'?<><button style={btnTiny} disabled={saving} onClick={()=>void proposalAction(p.id,'apply')}>应用</button>{' '}<button style={btnTiny} disabled={saving} onClick={()=>void proposalAction(p.id,'reject')}>拒绝</button></>:null}</td></tr>)}</tbody></table>
+        <b>{t('ui.proposals.title', { count: s.proposals.length })}</b><div style={dim}>{t('ui.proposals.desc')}</div>
+        <table style={{width:'100%',marginTop:8,...mono}}><tbody>{s.proposals.map(p=><tr key={p.id}><td>{p.action}</td><td>{p.targetSkill}</td><td>{p.state}</td><td style={{textAlign:'right',whiteSpace:'nowrap'}}>{p.state==='pending'?<><button style={btnTiny} disabled={saving} onClick={()=>void proposalAction(p.id,'apply')}>{t('ui.proposals.apply')}</button>{' '}<button style={btnTiny} disabled={saving} onClick={()=>void proposalAction(p.id,'reject')}>{t('ui.proposals.reject')}</button></>:null}</td></tr>)}</tbody></table>
       </div>:null}
 
       {/* ── Block 2: Approval queue ── */}
       <div style={box}>
-        <b>待确认记忆（审批门）</b>
-        <div style={dim}>模型写入的记忆默认 pending，不会自动注入；人工确认后才「始终生效」。</div>
+        <b>{t('ui.pending.title')}</b>
+        <div style={dim}>{t('ui.pending.desc')}</div>
         {s && s.memoryStats.pendingQueue.length > 0 ? (
           <>
             <table style={{ width: '100%', marginTop: 8, ...mono }}>
@@ -491,13 +490,13 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
                       <div>{r.content}</div>
                       {r.sourceContext ? (
                         <div style={{ ...dim, fontSize: 11, marginTop: 2, borderLeft: '2px solid var(--dsh-border, #444)', paddingLeft: 6 }}>
-                          来源：{r.sourceContext}
+                          {t('ui.pending.source')}{r.sourceContext}
                         </div>
                       ) : null}
                     </td>
                     <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
-                      <button style={btnTiny} disabled={saving} onClick={() => void rejectOne(r.id)} title="丢弃这条（可恢复，不会物理删除）">
-                        丢弃
+                      <button style={btnTiny} disabled={saving} onClick={() => void rejectOne(r.id)} title={t('ui.pending.discardTitle')}>
+                        {t('ui.pending.discard')}
                       </button>
                     </td>
                   </tr>
@@ -505,18 +504,18 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
               </tbody>
             </table>
             <button style={{ ...btnPrimary, marginTop: 10 }} disabled={saving} onClick={() => void confirmBatch()}>
-              批量确认全部（{s.memoryStats.pendingQueue.length}）
+              {t('ui.pending.confirmAll', { count: s.memoryStats.pendingQueue.length })}
             </button>
           </>
-        ) : <div style={{ ...dim, marginTop: 8 }}>（无待确认记忆）</div>}
+        ) : <div style={{ ...dim, marginTop: 8 }}>{t('ui.pending.empty')}</div>}
       </div>
 
       {/* ── Block 2.1: 已拒绝（U1 的恢复入口） ── */}
       {s?.rejectedQueue && s.rejectedQueue.length > 0 ? (
         <div style={box}>
-          <b>已拒绝（{s.rejectedQueue.length}）</b>
+          <b>{t('ui.rejected.title', { count: s.rejectedQueue.length })}</b>
           <div style={dim}>
-            丢弃的记忆不再注入、不占待确认额度、批量确认也不会收回；但不会被物理删除，随时可恢复。
+            {t('ui.rejected.desc')}
           </div>
           <table style={{ width: '100%', marginTop: 8, ...mono }}>
             <tbody>
@@ -525,8 +524,8 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
                   <td style={{ opacity: 0.6, whiteSpace: 'nowrap' }}>[{r.kind}/imp{r.importance}]</td>
                   <td style={{ paddingLeft: 8 }}>{r.content}</td>
                   <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
-                    <button style={btnTiny} disabled={saving} onClick={() => void restoreOne(r.id)} title="放回待确认队列">
-                      恢复
+                    <button style={btnTiny} disabled={saving} onClick={() => void restoreOne(r.id)} title={t('ui.rejected.restoreTitle')}>
+                      {t('ui.common.restore')}
                     </button>
                   </td>
                 </tr>
