@@ -8,6 +8,7 @@ import { MemoryStore } from '../../lib/store.js';
 import { runTidy } from '../../lib/tidy.js';
 import { appendAuditStrict } from '../../lib/prune-plan.js';
 import { validateConfigValue, readConfigView } from '../../lib/web-routes.js';
+import { t } from '../../lib/i18n.js';
 
 const DAY = 86400000;
 const NOW = Date.parse('2026-09-16T00:00:00Z');
@@ -176,7 +177,18 @@ test('tidy config is present at all five code touchpoints', () => {
   assert.match(index, /idleMinutes: z\.number/, 'idleMinutes schema touchpoint');
   assert.match(ui, /setConfig\(\{ idleMinutes:/, 'idleMinutes front-end control');
   assert.match(ui, /'manual' \| 'suggest' \| 'tidy'/, 'front-end type touchpoint');
-  assert.match(ui, /\['tidy', '整理'/, 'front-end control touchpoint');
+  // The option row, now language-independent: the label used to be the hardcoded
+  // Chinese '整理' and is a t() lookup since v0.7.0. What this touchpoint is really
+  // checking is that the UI OFFERS the tidy level, so match the row rather than the
+  // word -- otherwise translating the page silently "removes" a control that is there.
+  assert.match(ui, /\['tidy', t\('ui\.disposal\.tidy'\)/, 'front-end control touchpoint');
+  // And the label must still resolve to real text in both languages, or the row would
+  // render as a bare key name.
+  for (const lang of ['en', 'zh']) {
+    const label = t(lang, 'ui.disposal.tidy');
+    assert.ok(label.length > 0 && label !== 'ui.disposal.tidy',
+      `the tidy label is missing from the ${lang} table`);
+  }
 });
 
 test('no physical delete exists in tidy implementation', () => {
