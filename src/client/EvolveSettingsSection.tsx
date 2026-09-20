@@ -538,10 +538,9 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
       {/* ── Block 2.1b: 待认领 skill（ownership 绑定） ── */}
       {s?.unclaimedSkills && s.unclaimedSkills.length > 0 ? (
         <div style={box}>
-          <b>待认领 skill（{s.unclaimedSkills.length}）</b>
+          <b>{t('ui.unclaimed.title', { count: s.unclaimedSkills.length })}</b>
           <div style={dim}>
-            这些 skill 看起来是本插件早期生成的，但没有绑定本机身份。为避免把你手写的文件
-            误当成插件资产，插件不会自动认领：认领后才会进入自动改写路径，未认领时手动工具照常可用。
+            {t('ui.unclaimed.desc')}
           </div>
           <table style={{ width: '100%', marginTop: 8, ...mono }}>
             <tbody>
@@ -552,8 +551,8 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
                     {k.tag ? `tag: ${k.tag}` : ''}{k.version ? ` · v${k.version}` : ''}
                   </td>
                   <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
-                    <button style={btnTiny} disabled={saving} onClick={() => void claimSkills([k.name])} title="确认这是插件生成的 skill">
-                      认领
+                    <button style={btnTiny} disabled={saving} onClick={() => void claimSkills([k.name])} title={t('ui.unclaimed.claimTitle')}>
+                      {t('ui.unclaimed.claim')}
                     </button>
                   </td>
                 </tr>
@@ -565,7 +564,7 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
             disabled={saving}
             onClick={() => void claimSkills((s.unclaimedSkills ?? []).map((k) => k.name))}
           >
-            全部认领（{s.unclaimedSkills.length}）
+            {t('ui.unclaimed.claimAll', { count: s.unclaimedSkills.length })}
           </button>
         </div>
       ) : null}
@@ -573,34 +572,39 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
       {/* ── Block 2.2: 检索健康度 (v0.5.0 R5) ── */}
       {s?.retrieval ? (
         <div style={box}>
-          <b>记忆检索状态</b>
+          <b>{t('ui.retrieval.title')}</b>
           <div style={{ ...mono, marginTop: 8 }}>
             {s.retrieval.mode === 'fused' ? (
-              <span style={{ color: '#16a34a' }}>● 融合检索（bigram + 全文索引）— 召回最佳</span>
+              <span style={{ color: '#16a34a' }}>{t('ui.retrieval.fused')}</span>
             ) : s.retrieval.mode === 'bigram-only' ? (
-              <span style={{ color: 'var(--dsh-warn, #b45309)' }}>▲ 仅 bigram 检索 — 全文索引不可用，中文长句/转述查询召回会变差</span>
+              <span style={{ color: 'var(--dsh-warn, #b45309)' }}>{t('ui.retrieval.bigramOnly')}</span>
             ) : s.retrieval.mode === 'fts-degraded' ? (
-              <span style={{ color: '#dc2626' }}>▲ 全文索引运行时降级 — 召回质量已下降（错误 {s.retrieval.ftsErrorCount ?? 0} 次）</span>
+              <span style={{ color: '#dc2626' }}>{t('ui.retrieval.degraded', { errors: s.retrieval.ftsErrorCount ?? 0 })}</span>
             ) : (
-              <span style={dim}>状态未知（尚无检索发生）</span>
+              <span style={dim}>{t('ui.retrieval.unknown')}</span>
             )}
           </div>
           <div style={{ ...dim, fontSize: 12, marginTop: 4 }}>
-            全文索引：{s.retrieval.ftsEnabled ? '已启用' : '已关闭'} · {s.retrieval.ftsAvailable ? '可用' : '不可用'}
-            {typeof s.retrieval.fusedCount === 'number' ? ` · 融合 ${s.retrieval.fusedCount} 次 / 降级 ${s.retrieval.bigramOnlyCount ?? 0} 次` : ''}
+            {t('ui.retrieval.indexLine', {
+              enabled: s.retrieval.ftsEnabled ? t('ui.retrieval.enabled') : t('ui.retrieval.disabled'),
+              available: s.retrieval.ftsAvailable ? t('ui.retrieval.available') : t('ui.retrieval.unavailable'),
+            })}
+            {typeof s.retrieval.fusedCount === 'number'
+              ? t('ui.retrieval.counts', { fused: s.retrieval.fusedCount, degraded: s.retrieval.bigramOnlyCount ?? 0 })
+              : ''}
           </div>
         </div>
       ) : null}
 
       {/* ── Block 2.4: 处置自治程度 (v0.5.0 direction 2) ── */}
       <div style={box}>
-        <b>记忆处置自治程度</b>
-        <div style={dim}>决定系统如何处理冷记忆。手动/建议档不改数据；整理档只会自动「软删」符合严格规则的低价值记忆，可在下方已忘记区恢复。任何档位都不会自动物理删除，技能合并/归档也仍为手动。</div>
+        <b>{t('ui.disposal.title')}</b>
+        <div style={dim}>{t('ui.disposal.desc')}</div>
         <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {([
-            ['manual', '手动', '系统不主动提议。你自己在下方受控剪枝里筛选处理。'],
-            ['suggest', '建议', '空闲时自动重算「从未注入、从未召回、且过了冷静期」的低价值记忆，列给你看；仍然只提议、不自动删。'],
-            ['tidy', '整理', '空闲时自动软删同一批建议候选；每轮最多处理设定数量，可恢复，绝不物理删除；最高重要度、偏好、决策、待审、已拒绝和锁定项永不自动处理。'],
+            ['manual', t('ui.disposal.manual'), t('ui.disposal.manualDesc')],
+            ['suggest', t('ui.disposal.suggest'), t('ui.disposal.suggestDesc')],
+            ['tidy', t('ui.disposal.tidy'), t('ui.disposal.tidyDesc')],
           ] as const).map(([mode, label, desc]) => {
             const active = (cfg?.disposalMode ?? 'manual') === mode
             return (
@@ -618,24 +622,24 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
         </div>
         {(cfg?.disposalMode === 'suggest' || cfg?.disposalMode === 'tidy') ? (
           <label style={{ display: 'block', marginTop: 10 }}>
-            空闲触发时间：
+            {t('ui.disposal.idleLabel')}
             <input type="number" min={1} max={1440}
               style={{ width: 80, marginLeft: 8, padding: '4px 6px', borderRadius: 4, border: '1px solid var(--dsh-border, #444)' }}
               value={cfg.idleMinutes ?? 5} disabled={saving}
               onChange={(e) => void setConfig({ idleMinutes: Number(e.target.value) })}
-            /> 分钟
+            />{t('ui.disposal.minutes')}
           </label>
         ) : null}
         {cfg?.disposalMode === 'tidy' ? (
           <label style={{ display: 'block', marginTop: 10 }}>
-            每轮最多自动软删：
+            {t('ui.disposal.maxPerRunLabel')}
             <input
               type="number" min={1} max={100}
               style={{ width: 80, marginLeft: 8, padding: '4px 6px', borderRadius: 4, border: '1px solid var(--dsh-border, #444)' }}
               value={cfg.tidyMaxPerRun ?? 5}
               disabled={saving}
               onChange={(e) => void setConfig({ tidyMaxPerRun: Number(e.target.value) })}
-            /> 条
+            />{t('ui.disposal.items')}
           </label>
         ) : null}
         {(cfg?.disposalMode === 'suggest' || cfg?.disposalMode === 'tidy') && s?.disposalSuggest ? (
@@ -649,14 +653,14 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
                       <td style={{ opacity: 0.6, whiteSpace: 'nowrap' }}>[{c.kind}/imp{c.importance}]</td>
                       <td style={{ paddingLeft: 8 }}>
                         <div>{c.content}</div>
-                        <div style={{ ...dim, fontSize: 11 }}>冷置 {c.ageDays} 天 · {c.reason}</div>
+                        <div style={{ ...dim, fontSize: 11 }}>{t('ui.disposal.candidateMeta', { days: c.ageDays, reason: c.reason })}</div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            ) : <div style={{ ...dim, marginTop: 6 }}>（暂无低价值候选——库还小或都在用）</div>}
-            <div style={{ ...dim, fontSize: 12, marginTop: 6 }}>要真正清理，请到下方「受控剪枝」勾选执行（两阶段预览→确认，全部可逆）。</div>
+            ) : <div style={{ ...dim, marginTop: 6 }}>{t('ui.disposal.noCandidates')}</div>}
+            <div style={{ ...dim, fontSize: 12, marginTop: 6 }}>{t('ui.disposal.cleanupHint')}</div>
           </div>
         ) : null}
       </div>
