@@ -68,9 +68,9 @@ function check(label, actual, claim, tol = 1e-4) {
 console.log(`\n════ src = ${src} ════\n`);
 console.log(`MATCH_BASE_MIN = ${MATCH_BASE_MIN}`);
 console.log('\n【1】lib/search.js 注释 + f3 测试头部 + README 的三组 base 值');
-check('真阳性 base  (要求用什么语言回复 / PREF_NO_LANG)', base(PREF_NO_LANG, TRUE_Q, ['语言', '中文']), 0.8393);
-check('false1   base  (编程语言 / PREF_WITH_LANG)', base(PREF_WITH_LANG, F1_Q, ['语言', '中文']), 0.8065);
-check('false2   base  (处理流程 / 无关报告)', base(UNRELATED_REPORT, F2_Q), 1.7541);
+check('真阳性 base  (要求用什么语言回复 / PREF_NO_LANG)', base(PREF_NO_LANG, TRUE_Q, ['语言', '中文']), 2.0393);
+check('false1   base  (编程语言 / PREF_WITH_LANG) ← v0.7.0 起应为 0', base(PREF_WITH_LANG, F1_Q, ['语言', '中文']), 0);
+check('false2   base  (处理流程 / 无关报告)', base(UNRELATED_REPORT, F2_Q), 1.4541);
 
 console.log('\n【2】各自的 floor（阈值比较的对象）');
 check('floor(编程语言)               注释写 0.80', matchBaseMin(F1_Q), 0.8);
@@ -80,13 +80,13 @@ check('floor(这个技能的处理流程是怎样的) 注释写 0.60', matchBase
 console.log('\n【3】f3 测试头部声称的两个余量');
 const tp = base(PREF_NO_LANG, TRUE_Q, ['语言', '中文']);
 const f1 = base(PREF_WITH_LANG, F1_Q, ['语言', '中文']);
-check('"margin of 0.0328 in base terms"', tp - f1, 0.0328, 1e-4);
-check('"0.0065 above its own floor"', f1 - matchBaseMin(F1_Q), 0.0065, 1e-4);
+check('真阳性与 false1 的间距（v0.7.0: false1 归零，间距 = 真阳性本身）', tp - f1, 2.0393, 1e-3);
+check('false1 相对自身 floor（归零后应为 -floor）', f1 - matchBaseMin(F1_Q), -0.8, 1e-3);
 
 console.log('\n【4】README 声称旧的 1.41 / 1.47 / 3.07 是"返回分"（importance=2 基准）');
-check('PREF_WITH_LANG + 编程语言 (imp 2)', base(PREF_WITH_LANG, F1_Q, ['语言', '中文'], 2), 1.411, 5e-3);
-check('PREF_NO_LANG   + 要求用什么语言回复 (imp 2)', base(PREF_NO_LANG, TRUE_Q, ['语言', '中文'], 2), 1.469, 5e-3);
-check('UNRELATED_REPORT + 处理流程 (imp 2)', base(UNRELATED_REPORT, F2_Q, [], 2), 3.070, 5e-3);
+check('PREF_WITH_LANG + 编程语言 (imp 2) ← 已修好，应为 0', base(PREF_WITH_LANG, F1_Q, ['语言', '中文'], 2), 0, 5e-3);
+check('PREF_NO_LANG   + 要求用什么语言回复 (imp 2)', base(PREF_NO_LANG, TRUE_Q, ['语言', '中文'], 2), 3.5688, 5e-3);
+check('UNRELATED_REPORT + 处理流程 (imp 2)', base(UNRELATED_REPORT, F2_Q, [], 2), 2.5447, 5e-3);
 
 console.log('\n【5】search.js 的 floor 注释与实现是否同一个数');
 let minFloor = Infinity;

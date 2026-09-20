@@ -39,19 +39,38 @@ function loadRecords() {
  * 查询组。matcher: content 需包含的关键词（用于判定"哪条是正解"）。
  * 没有正解的（noise 探测）matcher=null，只看 topK 返回了什么。
  */
+/**
+ * Golden expectations, so a change in ranking FAILS rather than printing two sets of
+ * numbers for a human to compare.
+ *
+ * `expectMinRank` -- the correct record must come back at this rank or better.
+ * `expectMaxHits` -- an adversarial query must return at most this many records.
+ *
+ * Before v0.7.0 this file printed recall and MRR and stopped there, so "recall must
+ * not drop" was enforced by remembering to look. The adversarial case was worse than
+ * unchecked: its comment argued that returning the Chinese-preference record was an
+ * acceptable cost, which made the defect in issue #2 read as a design decision.
+ */
 const QUERIES = [
   // —— 转述型（记忆里写的是别的词面）——
-  { q: '要求用什么语言回复', matcher: ['中文', '语言'], type: '转述' },
-  { q: '回复语言', matcher: ['中文', '语言'], type: '转述' },
-  { q: '反向代理超时', matcher: ['反代', '超时', '504'], type: '转述' },
-  // —— 对抗性假阳性（防 R1 子串降权引入噪音）——
-  // 注意 R3(tags进索引)后：fused 模式下"编程语言"会因 tag"语言" OR-命中中文偏好记录
-  // （FTS OR 语义的已知代价，换来"回复语言"等 tag 召回）。这不是回归失败——bigram-only
-  // 降级路径仍 0 召回（打分器 tag 匹配是整串 includes，见 search.js scoreRecord）。
-  { q: '编程语言', matcher: null, type: '对抗', note: '库里应无"编程语言"；fused 下可能因 tag 命中中文偏好(R3 OR 语义已知代价), bigram-only 应 0' },
+  { q: '要求用什么语言回复', matcher: ['中文', '语言'], type: '转述', expectMinRank: 1 },
+  { q: '回复语言', matcher: ['中文', '语言'], type: '转述', expectMinRank: 1 },
+  { q: '反向代理超时', matcher: ['反代', '超时', '504'], type: '转述', expectMinRank: 1 },
+  // —— 对抗性假阳性 ——
+  // A single shared 2-gram («语言») is enough to reach the floor on its own, so this
+  // query recalls a record about replying in Chinese. That is issue #2. The previous
+  // comment here called it "the known cost of FTS OR semantics"; it is not a cost of
+  // OR semantics, it is FRAGMENT (0.6) being equal to the floor (0.6).
+  {
+    q: '编程语言',
+    matcher: null,
+    type: '对抗',
+    expectMaxHits: 0,
+    note: '库里无"编程语言"。expectMaxHits: 0 —— 这一条在修好 FRAGMENT/tag 判据之前【必须红】',
+  },
   // —— 既有正常查询（回归对照）——
-  { q: '超时', matcher: ['超时', '504', '反代'], type: '对照' },
-  { q: '反代', matcher: ['反代'], type: '对照' },
+  { q: '超时', matcher: ['超时', '504', '反代'], type: '对照', expectMinRank: 1 },
+  { q: '反代', matcher: ['反代'], type: '对照', expectMinRank: 1 },
 ];
 
 function recall(records, query, ftsIndex) {
@@ -64,7 +83,7 @@ function recall(records, query, ftsIndex) {
     const byId = new Map(records.map((r) => [r.id, r]));
     const ftsIds = ftsIndex.search(query, Math.max(want * 4, 20)).filter((id) => allowed.has(id));
     if (ftsIds.length > 0) {
-      hits = fuseRRF(bigramHits, ftsIds, byId, want);
+      hits = fuseRRF(bigramHits, ftsIds, byId, want, query, { recencyHalfLifeDays: 90 });
       path = 'fused';
     }
   }
@@ -87,7 +106,8 @@ async function main() {
   console.log(`# 口径: top-K 命中 + MRR (NOT 原始分数)\n`);
 
   let hitCount = 0; let mrrSum = 0; let scored = 0;
-  for (const { q, matcher, type, note } of QUERIES) {
+  const drift = [];
+  for (const { q, matcher, type, note, expectMinRank, expectMaxHits } of QUERIES) {
     const { hits, path } = recall(records, q, ftsIndex);
     const topContents = hits.map((h) => String(h.record.content).replace(/\s+/g, ' ').slice(0, 34));
     let line = `[${type}] "${q}"  (${path})`;
@@ -97,8 +117,22 @@ async function main() {
       const inTopK = rank > 0;
       if (inTopK) { hitCount += 1; mrrSum += 1 / rank; }
       line += `  -> 正解命中: ${inTopK ? `第${rank}名 (RR=${(1 / rank).toFixed(3)})` : 'MISS'}`;
+      if (expectMinRank !== undefined) {
+        const ok = inTopK && rank <= expectMinRank;
+        line += ok ? '  [golden ✅]' : `  [golden 🔴 期望 ≤ 第${expectMinRank}名]`;
+        if (!ok) {
+          drift.push(`"${q}": 期望正解在第 ${expectMinRank} 名以内，实测 ${inTopK ? `第 ${rank} 名` : 'MISS'}`);
+        }
+      }
     } else {
+      // An adversarial query is scored by how much it returns, not by rank: there is
+      // no correct record to rank.
       line += `  -> 噪音探测${note ? ' ('+note+')' : ''}: 返回${hits.length}条`;
+      if (expectMaxHits !== undefined) {
+        const ok = hits.length <= expectMaxHits;
+        line += ok ? '  [golden ✅]' : `  [golden 🔴 期望 ≤ ${expectMaxHits} 条]`;
+        if (!ok) drift.push(`"${q}": 期望最多 ${expectMaxHits} 条，实测 ${hits.length} 条`);
+      }
     }
     console.log(line);
     hits.forEach((h, i) => console.log(`    ${i + 1}. [${h.record.kind}/imp${h.record.importance}] ${topContents[i]}`));
@@ -110,8 +144,19 @@ async function main() {
   console.log(`## 汇总 (仅计有正解的 ${scored} 条查询)`);
   console.log(`   top-${TOPK} 召回率 = ${hitCount}/${scored} = ${(recallRate * 100).toFixed(1)}%`);
   console.log(`   MRR         = ${mrr.toFixed(4)}`);
-  console.log(`\n# 基线锚点(改 R1/R2/R3/R6 后重跑对比，召回率与 MRR 不得下降；对抗查询不得召回中文偏好)`);
   ftsIndex.close?.();
+
+  // A verdict, not a printout. Two sets of numbers side by side are only a gate if
+  // somebody diffs them, and nobody does that on every commit.
+  if (drift.length > 0) {
+    console.error(`\n🔴 golden drift —— ${drift.length} 项与期望不符:`);
+    for (const d of drift) console.error(`   - ${d}`);
+    console.error('\n改动打分逻辑后请先确认这是预期的改善，再更新 QUERIES 里的 golden 值；'
+      + '不要为了让它绿而放宽期望。');
+    process.exitCode = 1;
+    return;
+  }
+  console.log('\n✅ golden 全部符合期望');
 }
 
 main().catch((e) => { console.error('baseline failed:', e); process.exit(1); });
