@@ -41,7 +41,7 @@ const ROOT = repoRootFrom(here);
 export const SCOPE_DESCRIPTION = 'scripts/schema/*.test.mjs (top level)';
 
 /** Candidate count for the scope sentinel; re-derive deliberately. */
-export const CANDIDATE_SENTINEL = 34;
+export const CANDIDATE_SENTINEL = 35;
 
 /**
  * Known tautological assertions, as repo-relative `path:line`.
