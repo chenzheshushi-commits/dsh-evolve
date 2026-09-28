@@ -11,6 +11,11 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      harness_version:
+        description: 'Harness version to boot the plugin against (the real resolution path)'
+        required: false
+        default: '0.1.7-rc.2'
 
 jobs:
   verify:
@@ -100,3 +105,28 @@ jobs:
       # comments, README and test headers against the real scorer. Its threshold is
       # "every check green", so it needs no scope or recorded list.
       - run: pnpm run scan:comments
+
+  # The one gate that can see a HOST-side rename. Every test above imports
+  # lib/index.js through this repo's own node_modules, so when harness 0.1.7 renamed
+  # `CallId` to `ToolCallId` all 382 tests stayed green while the plugin failed to
+  # import at every boot ("evolve (dsh-evolve): failed to import"). Only booting the
+  # real thing -- with the plugin mounted by `link:`, which is the path the harness's
+  # ResolutionRouter special-cases -- can see that.
+  #
+  # Manual trigger only, on purpose: it installs and starts a whole harness
+  # (~500MB, a couple of minutes). Run it before a release and whenever the harness
+  # version this repo claims to support changes.
+  harness-boot:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+
+      - name: boot the plugin inside a real harness
+        run: node scripts/harness-boot-check.mjs --version "${{ github.event.inputs.harness_version }}"

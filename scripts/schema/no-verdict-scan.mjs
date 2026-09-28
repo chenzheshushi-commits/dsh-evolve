@@ -35,7 +35,7 @@ export const SCOPE_DESCRIPTION =
   'baseline/ + scripts/*.mjs (top level, excludes scripts/schema/) + root *.mjs';
 
 /** Candidate count for the scope sentinel; re-derive deliberately, never to silence. */
-export const CANDIDATE_SENTINEL = 8;
+export const CANDIDATE_SENTINEL = 9;
 
 /**
  * Files in scope that genuinely have no verdict exit.

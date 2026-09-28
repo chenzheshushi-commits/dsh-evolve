@@ -16,7 +16,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -322,5 +322,86 @@ test('every injected notice carries the v4 producer-owned source with a summary'
     process.env.HOME = prevHome;
     process.env.USERPROFILE = prevProfile;
     rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('every host symbol the plugin imports still exists at the pinned version', async () => {
+  // The 0.1.7 outage was a RENAME the host made (`CallId` -> `ToolCallId`) in a
+  // package this plugin imports. No unit test could see it: they all import
+  // lib/index.js through this repo's own node_modules, so the symbol was there.
+  // This gate asks the packages we actually import, by name, and refuses the build
+  // if one of them stopped exporting what we call.
+  const libDir = new URL('../../lib/', import.meta.url);
+  const files = readdirSync(libDir).filter((n) => n.endsWith('.js') && n !== 'client.js');
+  assert.ok(files.length >= 10, `expected the host half to have modules (found ${files.length})`);
+
+  /** Static import/re-export clauses plus dynamic imports, keyed by specifier. */
+  const importsOf = (name) => {
+    const src = readFileSync(new URL(name, libDir), 'utf8');
+    const out = new Map();
+    const push = (spec, names) => {
+      if (!spec.startsWith('@deepseek-ai/')) return;
+      const set = out.get(spec) ?? new Set();
+      for (const n of names) set.add(n);
+      out.set(spec, set);
+    };
+    for (const m of src.matchAll(/(?:import|export)\s+(type\s+)?([\s\S]*?)\s+from\s*['"]([^'"]+)['"]/g)) {
+      const clause = m[2];
+      const spec = m[3];
+      const brace = clause.match(/\{([^}]*)\}/);
+      const names = [];
+      if (brace) {
+        for (const raw of brace[1].split(',')) {
+          const n = raw.trim().replace(/^type\s+/, '').split(/\s+as\s+/)[0].trim();
+          if (n) names.push(n);
+        }
+      }
+      if (/^\*\s+as\s+/.test(clause)) names.push('*');
+      if (/^[A-Za-z_$][\w$]*\s*(,|$)/.test(clause.trim())) names.push('default');
+      if (m[1]) continue; // type-only: tsc already checks these
+      push(spec, names);
+    }
+    for (const m of src.matchAll(/import\(\s*['"]([^'"]+)['"]\s*\)/g)) {
+      push(m[1], ['(dynamic)']);
+    }
+    return out;
+  };
+
+  const checked = [];
+  for (const name of files) {
+    for (const [spec, names] of importsOf(name)) {
+      let mod;
+      try {
+        mod = await import(spec);
+      } catch (e) {
+        assert.fail(`${name} imports ${spec} but it does not resolve: ${e.message}`);
+      }
+      for (const n of names) {
+        if (n === '*' || n === '(dynamic)') continue;
+        checked.push(`${spec}.${n}`);
+        assert.ok(n in mod,
+          `${name} imports { ${n} } from ${spec}, which no longer exports it — `
+          + 'this is exactly the rename that made the plugin fail to import on 0.1.7');
+      }
+    }
+  }
+  assert.ok(checked.length >= 8,
+    `the import scan must cover the host surface (checked ${checked.join(', ') || 'none'})`);
+
+  // And no mixed host tree: the packages we share with the harness must be pinned
+  // to ONE version, because the harness may route them to its own copies.
+  const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
+  const pins = Object.entries(pkg.devDependencies)
+    .filter(([k]) => k.startsWith('@deepseek-ai/dsh-'));
+  assert.ok(pins.length >= 5, `expected host-shared pins (found ${pins.length})`);
+  const versions = new Set(pins.map(([, v]) => v));
+  assert.equal(versions.size, 1,
+    `host-shared packages are pinned to different versions: ${
+      pins.map(([k, v]) => `${k}@${v}`).join(', ')}`);
+  for (const [name] of pins) {
+    const installed = JSON.parse(readFileSync(
+      new URL(`../../node_modules/${name}/package.json`, import.meta.url), 'utf8'));
+    assert.equal(installed.version, pkg.devDependencies[name],
+      `${name} is installed at ${installed.version} but pinned at ${pkg.devDependencies[name]}`);
   }
 });
