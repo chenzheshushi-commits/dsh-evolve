@@ -171,8 +171,12 @@ test('tidy config is present at all five code touchpoints', () => {
   const index = readFileSync(new URL('../../lib/index.js', import.meta.url), 'utf8');
   const spec = readFileSync(new URL('../../lib/spec.js', import.meta.url), 'utf8');
   const ui = readFileSync(new URL('../../src/client/EvolveSettingsSection.tsx', import.meta.url), 'utf8');
+  const web = readFileSync(new URL('../../lib/web-routes.js', import.meta.url), 'utf8');
   assert.match(index, /z\.const\('tidy'\)/, 'schema touchpoint');
-  assert.match(index, /\['manual', 'suggest', 'tidy'\]\.includes/, 'settings base touchpoint');
+  // The old form was the `base` object passed to the harness's settings registrar;
+  // harness 0.1.7 derives that form from Config, so the boundary constraint lives in
+  // the one table the HTTP settings route validates against. Same rule, new home.
+  assert.match(web, /enum: \['manual', 'suggest', 'tidy'\]/, 'settings boundary touchpoint');
   assert.match(spec, /tidyMaxPerRun:\s*5/, 'defaults touchpoint');
   assert.match(index, /idleMinutes: z\.number/, 'idleMinutes schema touchpoint');
   assert.match(ui, /setConfig\(\{ idleMinutes:/, 'idleMinutes front-end control');

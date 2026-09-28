@@ -39,7 +39,7 @@ dsh plugin --profile web add github:chenzheshushi-commits/dsh-evolve
 Pin a specific release instead of tracking `main`:
 
 ```bash
-dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.7.0/dsh-evolve-0.7.0.tgz"
+dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.8.0/dsh-evolve-0.8.0.tgz"
 ```
 
 Then restart the harness — tools are discovered at startup, not hot-reloaded.
@@ -165,7 +165,7 @@ Notable switches:
 | `reviewEnabled` | `true` | Background per-turn review |
 | `reviewEveryTurns` | `5` | Review throttle |
 | `reviewModel` | *(main model)* | Route review to a different model |
-| `refineLLM` | `false` | Use an LLM pass when crystallizing/refining skills |
+| `refineLLM` | `true` | Use an LLM pass when crystallizing/refining skills (`false` = zero-token deterministic assembly) |
 | `reinforceEvery` | `3` | Observations per importance step |
 | `memoryMaxChars` | `20000` | Memory character budget (`0` disables) |
 | `convergeSuggest` | `true` | Surface merge/fold suggestions |
@@ -185,6 +185,70 @@ behavior on failure. Nothing runs in your main loop.
 - **No internal timers.** In-session work hangs off events; offline work is an external cron calling a tool.
 - **Ship blank.** No preloaded personal data. What it learns stays on your machine and is never packaged.
 - **Mechanisms over model smarts.** Safety comes from deterministic rules, so swapping models changes quality, never safety.
+
+---
+
+## What's new in v0.8.0 — Runs on harness 0.1.7
+
+This release exists because DeepSeek Harness 0.1.7 changed three contracts under
+this plugin at once. There is no new capability in it: every change keeps a promise
+the plugin already made on 0.1.5.
+
+**It loads again.** 0.1.7 resolves a linked plugin's `@deepseek-ai/dsh-*` imports
+against the RUNNING harness rather than against the plugin's own `node_modules`, and
+its `dsh-llm` renamed `CallId` to `ToolCallId`. The bundled `dsh-tools` copy still
+asked for the old name, so the whole plugin failed to import and the harness reported
+`evolve (dsh-evolve): failed to import` on every boot. Every host-shared dependency
+is now pinned to the harness version that loads it, and the browser half no longer
+references the retired `dsh-client-runtime` package (its `Context` moved to
+`@deepseek-ai/cordis`; `slots` comes from `dsh-client-ui-renderer`).
+
+**Injected notices are valid session data again.** 0.1.7 moved the session log to
+format v4 and refuses the v3 `{ kind: 'plugin', plugin: '…' }` source wrapper
+outright. Writing that shape would make the harness refuse the log the moment it
+read it back — the same failure a missing `summary` caused in v0.5.2. Every injected
+message now carries the producer-owned kind `plugin:dsh-evolve` (exactly what the
+harness's own v3→v4 migrator derives for this plugin), built through one helper so
+the shape cannot drift between the eight call sites.
+
+**Settings survive a restart.** 0.1.7 derives the editable form from this plugin's
+own `Config` schema and persists an edit through the profile's own patch, then
+commits it into the plugin's live references without remounting anything. Every key
+the settings page can change is declared `.volatile()` for that reason, and the
+plain object the store reads is mirrored from those references on every commit — so
+an edit takes effect immediately AND is still there after a restart, and the two
+views cannot drift apart. On a host with no settings surface (headless) the write
+stays in memory and says so in the log instead of failing.
+
+**The language override is reachable from the page again.** It used to live in the
+harness-generated settings form, and 0.1.7 ships no client that renders those forms
+yet. It is now a control on this plugin's own settings page.
+
+### New configuration
+
+| Key | Default | Effect |
+|---|---|---|
+| `refineLLM` | `true` | LLM pass when crystallizing/refining; `false` is zero-token assembly |
+| `tier1Enabled` | `true` | Always-on preference snapshot at turn start |
+| `maxPendingQueue` | `50` | Hard cap on the pending review queue |
+| `disposalMinIdleDays` | `30` | Days of zero use before a memory is a cold candidate |
+| `idleMinutes` | `5` | Idle delay before suggest/tidy recompute |
+| `approvalPromptEnabled` | `false` | Ask in-turn for direct high-value memory writes |
+| `language` | `follow-host` | `follow-host`, `en`, or `zh` for this page and the injected prompts |
+
+Every key here was already configurable; what changed is where the value is stored
+and how it reaches the running plugin. Governance knobs nobody has asked to tune at
+runtime (curator thresholds, heat decay, memory budget, retrieval knobs) remain
+ordinary YAML config and are not part of the settings form.
+
+### Boundaries
+
+Two processes sharing one evolve workspace now contend on an instance lock instead
+of on the same store. The instance that does not hold the lock refuses automatic
+work rather than competing: automatic tidy degrades to a review list
+(`lockVerdict.acquired` is false), and controlled pruning is refused outright
+("another instance owns this workspace; pruning is disabled here"). No tier ever
+deletes a skill — archiving and rollback stay human actions.
 
 ---
 

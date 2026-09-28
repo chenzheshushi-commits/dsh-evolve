@@ -59,6 +59,7 @@ interface EvolveState {
     disposalMode: 'manual' | 'suggest' | 'tidy'
     disposalMinIdleDays: number; tidyMaxPerRun: number; idleMinutes: number
     skillProposalMode: 'inherit'|'manual'|'balanced'|'autonomous'; skillAutoMaxChars:number; skillMaxChars:number
+    language: 'follow-host' | 'en' | 'zh'
     approvalPromptEnabled:boolean; approvalPromptMaxPerTurn:number
   }
   models: ModelRow[]
@@ -360,6 +361,22 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
     <div>
       <h2 style={{ marginTop: 0 }}>dsh-evolve</h2>
       <p style={dim}>{t('ui.page.subtitle')}</p>
+
+      {/* ── Block 0: UI / prompt language (the documented override) ── */}
+      <div style={box}>
+        <b>{t('ui.language.title')}</b>
+        <div style={dim}>{t('ui.language.desc')}</div>
+        <select
+          value={cfg?.language ?? 'follow-host'}
+          disabled={saving || !cfg}
+          onChange={(e) => void setConfig({ language: e.target.value })}
+          style={{ marginTop: 8, padding: 6 }}
+        >
+          <option value="follow-host">{t('ui.language.followHost')}</option>
+          <option value="en">{t('ui.language.en')}</option>
+          <option value="zh">{t('ui.language.zh')}</option>
+        </select>
+      </div>
 
       {/* ── Block 1: LLM refinement ── */}
       <div style={box}>

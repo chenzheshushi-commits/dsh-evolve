@@ -22,8 +22,7 @@ const CLIENT_EXTERNAL = [
   'react-dom',
   'react-dom/client',
   'react/jsx-runtime',
-  '@deepseek-ai/dsh-client-runtime/client',
-  '@deepseek-ai/dsh-client-connection/client',
+  '@deepseek-ai/dsh-client-ui-renderer/client',
   '@deepseek-ai/dsh-client-ui-settings/client',
   '@deepseek-ai/dsh-client-ui-slots',
 ]
