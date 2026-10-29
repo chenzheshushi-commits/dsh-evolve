@@ -22,11 +22,11 @@ function makeTable() {
 }
 
 // Mock a trusted loopback request + a capturing response.
-function mockReq({ method = 'GET', body } = {}) {
+function mockReq({ method = 'GET', body, headers = {} } = {}) {
   const req = {
     method,
     socket: { remoteAddress: '127.0.0.1' },
-    headers: { host: '127.0.0.1:3080', 'sec-fetch-site': 'same-origin', 'content-type': 'application/json' },
+    headers: { host: '127.0.0.1:3080', 'sec-fetch-site': 'same-origin', 'content-type': 'application/json', ...headers },
   };
   // async-iterable body for POST
   req[Symbol.asyncIterator] = async function* () { if (body !== undefined) yield Buffer.from(JSON.stringify(body)); };
@@ -98,6 +98,30 @@ await store.remember({ content: '一条待确认记忆', kind: 'note', importanc
   await R['/api/evolve/state'].handler(badReq, res);
   assert.equal(res.statusCode, 403, 'non-loopback -> 403 (fence works)');
   console.log('OK web fence: non-loopback request refused 403');
+}
+
+// Issue #3: the desktop (Electron) shell serves the settings section from
+// dsh-app://app, so its writes carry that Origin. Same loopback socket + the
+// app's own scheme host must reach the handler; any other app-scheme host and
+// an opaque `null` origin must still be refused. Driven end-to-end through the
+// real route handler, not the guard function alone.
+{
+  const res = mockRes();
+  await R['/api/evolve/action'].handler(
+    mockReq({ method: 'POST', body: { action: 'set-config', idleMinutes: 7 }, headers: { origin: 'dsh-app://app' } }), res);
+  assert.equal(res.statusCode, 200, 'dsh-app://app origin -> 200 (desktop settings page can save)');
+  assert.equal(cfg.idleMinutes, 7, 'the write actually reached the live config, not just the status code');
+  console.log('OK desktop origin: dsh-app://app may write config');
+}
+{
+  for (const origin of ['dsh-app://evil', 'null', 'http://127.0.0.1:9999']) {
+    const res = mockRes();
+    await R['/api/evolve/action'].handler(
+      mockReq({ method: 'POST', body: { action: 'set-config', idleMinutes: 9 }, headers: { origin } }), res);
+    assert.equal(res.statusCode, 403, `origin ${origin} -> 403`);
+  }
+  assert.equal(cfg.idleMinutes, 7, 'refused writes did not touch the config');
+  console.log('OK desktop origin fence: other app host / null / other authority refused');
 }
 
 // POST /action set-config (pick a model + turn refine off)
