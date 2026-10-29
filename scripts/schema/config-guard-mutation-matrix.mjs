@@ -169,7 +169,11 @@ const CASES = [
     id: 'C2',
     name: 'apply 忽略宿主传入的 config（index.js:212 去掉 ...config）',
     file: IDX,
-    from: '  const cfg = { ...MEMORY_DEFAULTS, ...SKILL_DEFAULTS, ...config };',
+    // v0.8.0 renamed the spread source to readLiveConfig(config); the old anchor
+    // stopped matching and the matrix reported "anchor not found" instead of
+    // exercising the gate -- a stale anchor is a silent hole, so keep this text
+    // in sync with lib/index.js.
+    from: '  const cfg = { ...MEMORY_DEFAULTS, ...SKILL_DEFAULTS, ...readLiveConfig(config) };',
     to: '  const cfg = { ...MEMORY_DEFAULTS, ...SKILL_DEFAULTS };',
     expectRed: true,
     note: '测「宿主配置有没有被端到端读入」；仍绿 = 覆盖缺口',
