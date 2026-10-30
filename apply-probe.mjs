@@ -6,7 +6,7 @@
 // a storageDomain race that can silently skip the plugin; a mock ctx does not).
 // Run: ~/.local/node22/bin/node apply-probe.mjs
 import assert from 'node:assert';
-import { mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -31,7 +31,7 @@ function makeDomain() {
 }
 
 // ── record-only mock ctx (captures every registration) ────────────────────────
-const registered = { tools: [], sections: [], hooks: [], effects: 0, childPlugins: [], routes: [] };
+const registered = { tools: [], sections: [], hooks: [], effects: 0, childPlugins: [], routes: [], routeObjects: [] };
 const ctx = {
   logger: { info() {}, warn() {}, error() {} },
   storageDomain: {
@@ -61,8 +61,10 @@ const ctx = {
     const satisfied = deps.every((d) => ctx[d] !== undefined);
     if (satisfied && typeof child?.apply === 'function') { void child.apply(ctx, cfg2); }
   },
-  // webServer present (web profile). Records registered route paths.
-  webServer: { register: (route) => { registered.routes.push(route.path); return () => {}; } },
+  // webServer present (web profile). Records registered route paths AND the
+  // route objects, so a route can be driven for real (see the refusal-log
+  // assertion below).
+  webServer: { register: (route) => { registered.routes.push(route.path); registered.routeObjects.push(route); return () => {}; } },
 };
 
 const mod = await import('./lib/index.js');
@@ -138,6 +140,34 @@ assert.deepEqual([...registered.routes].sort(), [
   '/api/evolve/skills/archives',
   '/api/evolve/state',
 ].sort(), 'the registered route set must match exactly');
+
+// ── the refusal log lands in the HARNESS HOME, driven through the real route ──
+// v0.8.1 wrote it to $DSH_HOME only, so on a default install (the harness does
+// not export that variable to plugin processes) it went NOWHERE. The home is
+// now passed down from apply(). This drives the REAL route handler that
+// apply() registered, so it pins the wiring end to end — a home that is the
+// workspace instead of the harness home would put the log one level wrong.
+{
+  const actionRoute = registered.routeObjects.find((r) => r.path === '/api/evolve/action');
+  assert.ok(actionRoute, 'the action route object was captured');
+  const logPath = join(home, 'evolve-guard-debug.log');
+  assert.equal(existsSync(logPath), false, 'no refusal log before a refusal happens');
+  const res = { statusCode: 0, body: '', writeHead(s) { this.statusCode = s; }, end(b) { this.body = b ?? ''; } };
+  await actionRoute.handler({
+    method: 'POST',
+    socket: { remoteAddress: '127.0.0.1' },
+    headers: { host: '127.0.0.1:3080', origin: 'dsh-app://evil', 'sec-fetch-site': 'same-origin', 'content-type': 'application/json' },
+    [Symbol.asyncIterator]: async function* () { yield Buffer.from(JSON.stringify({ action: 'set-config', idleMinutes: 11 })); },
+  }, res);
+  assert.equal(res.statusCode, 403, 'a foreign app-scheme origin is refused');
+  assert.ok(existsSync(logPath), `the refusal log must land in the harness home: ${logPath}`);
+  assert.equal(existsSync(join(home, 'evolve-workspace', 'evolve-guard-debug.log')), false,
+    'the log belongs to the harness home, not the plugin workspace');
+  const text = readFileSync(logPath, 'utf8');
+  assert.match(text, /origin=dsh-app:\/\/evil/, 'and it records the refused origin');
+  assert.doesNotMatch(text, /token=/i, 'never a token');
+  console.log('  refusal log ->', logPath, '(in the harness home, via the real route)');
+}
 
 rmSync(home, { recursive: true, force: true });
 console.log('OK apply() probe:');

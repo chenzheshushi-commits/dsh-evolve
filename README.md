@@ -199,8 +199,9 @@ on a default install the log was written nowhere. That is the one case where
 someone needs to read it.
 
 The plugin now resolves the harness home exactly the way the harness does (one
-shared resolver, used by the plugin workspace and the log alike), and creates the
-directory if it does not exist yet. The log lands at `<harness home>/evolve-guard-debug.log`.
+shared resolver, used by the plugin workspace and the log alike) and passes it
+down to the control plane, and the log's directory is created when it does not
+exist yet. The log lands at `<harness home>/evolve-guard-debug.log`.
 
 ## What's new in v0.8.1 — Memory belongs to a workspace, and the desktop app can save
 

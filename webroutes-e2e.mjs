@@ -2,7 +2,7 @@
 // + mock req/res, proving /api/evolve/state and /api/evolve/action work end to
 // end (loopback fence, config read, batch-confirm, set-config). No server needed.
 import assert from 'node:assert';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -366,6 +366,25 @@ await store.remember({ content: '一条待确认记忆', kind: 'note', importanc
     'the provider is still offered with a blank default instead of blocking');
   assert.ok(elapsed < 8000, `state answered in ${elapsed}ms (bounded by the model-listing timeout)`);
   console.log(`OK web /state: hanging model provider degrades to models:[] in ${elapsed}ms`);
+}
+
+// v0.8.2: the refusal log must land in the home the CALLER injects, through the
+// real route handler — not wherever the plugin process happens to have
+// $DSH_HOME (the harness does not export it, so v0.8.1 wrote nowhere).
+{
+  const logHome = join(mkdtempSync(join(tmpdir(), 'evolve-loghome-')), 'nested', '.dsh');
+  const logRoutes = routeMap(makeEvolveRoutes({ ...deps, dshHome: logHome }));
+  const res = mockRes();
+  await logRoutes['/api/evolve/action'].handler(
+    mockReq({ method: 'POST', body: { action: 'set-config', idleMinutes: 11 }, headers: { origin: 'dsh-app://evil' } }), res);
+  assert.equal(res.statusCode, 403, 'the request is refused');
+  const logPath = join(logHome, 'evolve-guard-debug.log');
+  assert.ok(existsSync(logPath), `the refusal log must be written to the injected home: ${logPath}`);
+  const text = readFileSync(logPath, 'utf8');
+  assert.match(text, /origin=dsh-app:\/\/evil/, 'and it records the origin that was refused');
+  assert.match(text, /reject=origin-host-mismatch/, 'and the reason');
+  assert.doesNotMatch(text, /token=/i, 'never a token');
+  console.log('OK web guard: the refusal log lands in the injected home');
 }
 
 rmSync(ws, { recursive: true, force: true });

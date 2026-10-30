@@ -66,17 +66,15 @@ test('the fence itself is unchanged: loopback socket + loopback Host required', 
 
 test('a refusal is recorded with the three headers that decide it (and no token)', () => {
   const home = mkdtempSync(join(tmpdir(), 'guard-log-'));
-  const prev = process.env.DSH_HOME;
-  process.env.DSH_HOME = home;
   try {
     const path = join(home, 'evolve-guard-debug.log');
     assert.equal(existsSync(path), false, 'no log file until something is actually refused');
 
     // Refused because the origin is opaque: the case a desktop-shell report
     // would first need to distinguish from a hostile one.
-    isTrustedLocalRequest(req({ origin: 'null', 'sec-fetch-site': 'same-origin' }));
+    isTrustedLocalRequest(req({ origin: 'null', 'sec-fetch-site': 'same-origin' }), { home });
     // Refused because the authority differs.
-    isTrustedLocalRequest(req({ origin: 'http://127.0.0.1:9999' }));
+    isTrustedLocalRequest(req({ origin: 'http://127.0.0.1:9999' }), { home });
 
     const text = readFileSync(path, 'utf8');
     assert.match(text, /origin=null/, 'opaque origin recorded verbatim');
@@ -86,35 +84,49 @@ test('a refusal is recorded with the three headers that decide it (and no token)
     assert.equal(text.trim().split('\n').length, 2, 'one line per refusal, no spam');
 
     // A trusted request must not add noise.
-    isTrustedLocalRequest(req({ origin: 'dsh-app://app', 'sec-fetch-site': 'same-origin' }));
+    isTrustedLocalRequest(req({ origin: 'dsh-app://app', 'sec-fetch-site': 'same-origin' }), { home });
     assert.equal(readFileSync(path, 'utf8').trim().split('\n').length, 2, 'accepted requests are not logged');
 
     // Never a credential: the harness token rides in the query string, not here.
     assert.doesNotMatch(text, /token=/i);
   } finally {
-    if (prev === undefined) delete process.env.DSH_HOME; else process.env.DSH_HOME = prev;
     rmSync(home, { recursive: true, force: true });
   }
 });
 
-test('the refusal log lands in the default home when DSH_HOME is NOT set', () => {
-  // v0.8.1 read process.env.DSH_HOME only, so on a default install (the variable
-  // is not exported) the log was written NOWHERE — the one case where someone
-  // needs to read it. The harness resolves its home as $DSH_HOME, else ~/.dsh;
-  // the log must land in the same place.
-  const home = mkdtempSync(join(tmpdir(), 'guard-default-'));
-  const prev = process.env.DSH_HOME;
-  delete process.env.DSH_HOME;
-  const prevHome = process.env.HOME;
-  process.env.HOME = home;                     // so the default ~/.dsh resolves here
+test('the refusal log lands in the injected home, and creates it when missing', () => {
+  // v0.8.1 read process.env.DSH_HOME only, so on a default install (the
+  // harness does not export that variable to plugin processes) the log was
+  // written NOWHERE — the one case where someone needs to read it. The home is
+  // now injected by the caller, which already knows it.
+  //
+  // The home is passed in rather than derived from $HOME on purpose: on
+  // Windows os.homedir() ignores $HOME, so a test that rewrote the
+  // environment proved nothing there (it failed the first CI run).
+  const base = mkdtempSync(join(tmpdir(), 'guard-default-'));
+  const home = join(base, 'not-created-yet', '.dsh');
   try {
-    isTrustedLocalRequest(req({ origin: 'null', 'sec-fetch-site': 'same-origin' }));
-    const path = join(home, '.dsh', 'evolve-guard-debug.log');
-    assert.ok(existsSync(path), `the log must exist at ${path} without DSH_HOME set`);
+    isTrustedLocalRequest(req({ origin: 'null', 'sec-fetch-site': 'same-origin' }), { home });
+    const path = join(home, 'evolve-guard-debug.log');
+    assert.ok(existsSync(path), `the log must exist at ${path}`);
     assert.match(readFileSync(path, 'utf8'), /origin=null/, 'and it holds the refusal');
   } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test('without an injected home the log still lands in the harness home', () => {
+  // The fallback path: the plugin resolves the harness home the way the
+  // harness does ($DSH_HOME, else ~/.dsh). It must not silently write nothing.
+  const prev = process.env.DSH_HOME;
+  const home = mkdtempSync(join(tmpdir(), 'guard-fallback-'));
+  process.env.DSH_HOME = home;
+  try {
+    isTrustedLocalRequest(req({ origin: 'null', 'sec-fetch-site': 'same-origin' }));
+    const path = join(home, 'evolve-guard-debug.log');
+    assert.ok(existsSync(path), `the fallback log must exist at ${path}`);
+  } finally {
     if (prev === undefined) delete process.env.DSH_HOME; else process.env.DSH_HOME = prev;
-    if (prevHome === undefined) delete process.env.HOME; else process.env.HOME = prevHome;
     rmSync(home, { recursive: true, force: true });
   }
 });
