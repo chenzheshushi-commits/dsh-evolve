@@ -39,7 +39,7 @@ dsh plugin --profile web add github:chenzheshushi-commits/dsh-evolve
 Pin a specific release instead of tracking `main`:
 
 ```bash
-dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.8.0/dsh-evolve-0.8.0.tgz"
+dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.8.1/dsh-evolve-0.8.1.tgz"
 ```
 
 Then restart the harness — tools are discovered at startup, not hot-reloaded.
@@ -187,6 +187,37 @@ behavior on failure. Nothing runs in your main loop.
 - **Mechanisms over model smarts.** Safety comes from deterministic rules, so swapping models changes quality, never safety.
 
 ---
+
+## What's new in v0.8.1 — Memory belongs to a workspace, and the desktop app can save
+
+**Project-scoped memory.** One host process shares one memory store across every
+session, so project-scope records were recallable everywhere: a session working in
+repo A got repo B's memories injected whenever the query text happened to overlap.
+A memory written from a session is now stamped with that session's workspace root,
+and a project-scope record is visible only inside its own workspace. `user`-scope
+records stay global; records written before this version carry no workspace and stay
+visible everywhere (fail-open) — so this stops NEW cross-project pollution, it does
+not retroactively hide the existing corpus. Manual recall takes `allProjects: true`
+for a deliberate cross-project lookup.
+
+The key is the normalized full workspace path, not the directory's last segment: two
+`app` directories are two projects, and a session started in a subdirectory is not a
+different project. The visibility rule is one function, used by the recall pool, the
+near-duplicate reinforcement loop, the pending-queue cap and the write-quality
+assessment — filtering only recall would leave the write side cross-project, where an
+A-workspace write that happens to be a near-duplicate of a B-workspace record would
+reinforce (and possibly rewrite the content of) that other project's memory.
+
+**The settings page works inside the desktop app.** The desktop shell serves its
+renderer from the `dsh-app://app` scheme, and the loopback guard compared the
+request's Origin host against the `Host` header — which can never match for an
+app-scheme page, so every save came back `403`. That exact scheme and host are now
+trusted alongside the loopback origin. Deliberately narrow: `Origin: null` (what a
+`file://` page sends) and every other app scheme stay refused, because the guard's
+real weight is the loopback socket, the loopback `Host` and the non-cross-site check.
+Each refusal now records the three headers that decide it — `origin`, `host`,
+`sec-fetch-site`, never a token — to `$DSH_HOME/evolve-guard-debug.log`, so a report
+of "the page says 403" is answerable from the machine instead of by guesswork.
 
 ## What's new in v0.8.0 — Runs on harness 0.1.7
 
