@@ -57,7 +57,7 @@ const unclaimedFixture = [
   { name: 'legacy-one', tag: 'reverse-proxy', version: '1.0.0', createdAt: '2026-01-01T00:00:00Z' },
 ]
 
-const routes = makeEvolveRoutes({
+const deps = {
   store, llm,
   getConfig: () => cfg,
   setConfig: (patch) => { Object.assign(cfg, patch); },
@@ -70,7 +70,8 @@ const routes = makeEvolveRoutes({
     unclaimedFixture.splice(i, 1)
     return { claimed: true, name }
   },
-});
+};
+const routes = makeEvolveRoutes(deps);
 const R = routeMap(routes);
 assert.ok(R['/api/evolve/state'] && R['/api/evolve/action'], 'both routes present');
 
@@ -345,6 +346,26 @@ await store.remember({ content: '一条待确认记忆', kind: 'note', importanc
     assert.equal(JSON.parse(res.body).status, 'plan-expired', 'unknown digest -> plan-expired');
   }
   console.log('OK web /prune: fence 403, list candidates, preview->execute, idempotent retry, plan-expired');
+}
+
+// v0.8.1: /state must ANSWER even when a provider's model listing hangs.
+// Real failure this pins: an unreachable api.deepseek.com made listModels()
+// never settle, so the route sat at HTTP 000 and the settings page was blank —
+// a try/catch around an await cannot catch "never answers".
+{
+  const hangingLlm = { listProviders: () => [{ id: 'p1' }], listModels: () => new Promise(() => {}) };
+  const hangRoutes = routeMap(makeEvolveRoutes({ ...deps, llm: hangingLlm }));
+  const started = Date.now();
+  const res = mockRes();
+  await hangRoutes['/api/evolve/state'].handler(mockReq({ method: 'GET' }), res);
+  const elapsed = Date.now() - started;
+  assert.equal(res.statusCode, 200, 'state answers 200 with a hanging model provider');
+  // A provider that would not enumerate still gets offered with a blank model
+  // (blank = that provider's default), which is the designed degradation.
+  assert.deepEqual(JSON.parse(res.body).models, [{ provider: 'p1', model: '' }],
+    'the provider is still offered with a blank default instead of blocking');
+  assert.ok(elapsed < 8000, `state answered in ${elapsed}ms (bounded by the model-listing timeout)`);
+  console.log(`OK web /state: hanging model provider degrades to models:[] in ${elapsed}ms`);
 }
 
 rmSync(ws, { recursive: true, force: true });

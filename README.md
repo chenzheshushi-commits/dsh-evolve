@@ -219,6 +219,15 @@ Each refusal now records the three headers that decide it — `origin`, `host`,
 `sec-fetch-site`, never a token — to `$DSH_HOME/evolve-guard-debug.log`, so a report
 of "the page says 403" is answerable from the machine instead of by guesswork.
 
+**The settings page no longer hangs on an unreachable model provider.** `/state`
+enumerates models through `llm.listModels()`, which performs a real HTTP request
+for an account/API provider. A host with no route to that API does not always fail
+— it can simply never answer, and nothing in a `try/catch` catches "never answers":
+the route sat at no response at all and the page rendered nothing. Each provider
+listing is now bounded (1.5 s) and the whole enumeration is bounded (3 s); a
+provider that would not answer is still offered with a blank model (that provider's
+default) instead of taking the page down with it.
+
 ## What's new in v0.8.0 — Runs on harness 0.1.7
 
 This release exists because DeepSeek Harness 0.1.7 changed three contracts under
