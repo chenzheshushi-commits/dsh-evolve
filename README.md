@@ -39,7 +39,7 @@ dsh plugin --profile web add github:chenzheshushi-commits/dsh-evolve
 Pin a specific release instead of tracking `main`:
 
 ```bash
-dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.8.1/dsh-evolve-0.8.1.tgz"
+dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.8.2/dsh-evolve-0.8.2.tgz"
 ```
 
 Then restart the harness — tools are discovered at startup, not hot-reloaded.
@@ -187,6 +187,20 @@ behavior on failure. Nothing runs in your main loop.
 - **Mechanisms over model smarts.** Safety comes from deterministic rules, so swapping models changes quality, never safety.
 
 ---
+
+## What's new in v0.8.2 — The refusal log actually lands somewhere
+
+**The guard's refusal log now exists on a default install.** v0.8.1 introduced a
+log of refused control-plane requests (the `origin`, `host` and `sec-fetch-site`
+that decide the refusal), but it wrote to `$DSH_HOME` only when that environment
+variable was set. The harness resolves its home as `$DSH_HOME` when set and
+`~/.dsh` otherwise, and it does not export the variable to plugin processes — so
+on a default install the log was written nowhere. That is the one case where
+someone needs to read it.
+
+The plugin now resolves the harness home exactly the way the harness does (one
+shared resolver, used by the plugin workspace and the log alike), and creates the
+directory if it does not exist yet. The log lands at `<harness home>/evolve-guard-debug.log`.
 
 ## What's new in v0.8.1 — Memory belongs to a workspace, and the desktop app can save
 

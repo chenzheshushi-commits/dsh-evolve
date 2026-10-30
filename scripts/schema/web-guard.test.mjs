@@ -19,9 +19,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { homedir } from 'node:os';
+import { join, isAbsolute } from 'node:path';
 
 import { isTrustedLocalRequest } from '../../lib/web-routes.js';
+import { resolveDshHome } from '../../lib/dsh-home.js';
 
 const req = (headers, remoteAddress = '127.0.0.1') => ({
   socket: { remoteAddress },
@@ -95,12 +97,34 @@ test('a refusal is recorded with the three headers that decide it (and no token)
   }
 });
 
-test('without DSH_HOME the diagnostic stays silent instead of throwing', () => {
+test('the refusal log lands in the default home when DSH_HOME is NOT set', () => {
+  // v0.8.1 read process.env.DSH_HOME only, so on a default install (the variable
+  // is not exported) the log was written NOWHERE — the one case where someone
+  // needs to read it. The harness resolves its home as $DSH_HOME, else ~/.dsh;
+  // the log must land in the same place.
+  const home = mkdtempSync(join(tmpdir(), 'guard-default-'));
   const prev = process.env.DSH_HOME;
   delete process.env.DSH_HOME;
+  const prevHome = process.env.HOME;
+  process.env.HOME = home;                     // so the default ~/.dsh resolves here
   try {
-    assert.doesNotThrow(() => isTrustedLocalRequest(req({ origin: 'null' })));
+    isTrustedLocalRequest(req({ origin: 'null', 'sec-fetch-site': 'same-origin' }));
+    const path = join(home, '.dsh', 'evolve-guard-debug.log');
+    assert.ok(existsSync(path), `the log must exist at ${path} without DSH_HOME set`);
+    assert.match(readFileSync(path, 'utf8'), /origin=null/, 'and it holds the refusal');
   } finally {
-    if (prev !== undefined) process.env.DSH_HOME = prev;
+    if (prev === undefined) delete process.env.DSH_HOME; else process.env.DSH_HOME = prev;
+    if (prevHome === undefined) delete process.env.HOME; else process.env.HOME = prevHome;
+    rmSync(home, { recursive: true, force: true });
   }
+});
+
+test('the harness home resolves the way the harness resolves it', () => {
+  // One resolver, shared by the plugin workspace and the refusal log, so the
+  // two can never disagree about where the harness home is.
+  assert.equal(resolveDshHome({ DSH_HOME: '/tmp/x' }), '/tmp/x');
+  assert.equal(resolveDshHome({ DSH_HOME: '   ' }), resolveDshHome({}), 'blank falls back');
+  assert.equal(resolveDshHome({}), join(homedir(), '.dsh'), 'default is ~/.dsh');
+  assert.equal(resolveDshHome({ DSH_HOME: '~/h' }), join(homedir(), 'h'), 'tilde expands');
+  assert.ok(isAbsolute(resolveDshHome({ DSH_HOME: 'rel/path' })), 'a relative value becomes absolute');
 });
