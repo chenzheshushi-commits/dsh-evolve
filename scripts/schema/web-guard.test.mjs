@@ -45,23 +45,47 @@ test('the desktop shell origin is trusted (settings page can save)', () => {
   assert.equal(isTrustedLocalRequest(req({ origin: 'dsh-app://app' })), true, 'Origin present, no fetch metadata');
 });
 
+test("the desktop proxy's bare request (no Origin, no Sec-Fetch-Site) is accepted", () => {
+  // Electron's forwardWebRequest deletes Origin, Host, Cookie and Sec-Fetch-Site
+  // before forwarding to the Host, so the app's settings writes arrive with
+  // neither header. v0.8.3 required Sec-Fetch-Site here and refused every save.
+  assert.equal(isTrustedLocalRequest(req({})), true,
+    'no Origin + no fetch metadata is the desktop shell proxy shape');
+  assert.equal(isTrustedLocalRequest(req({ 'sec-fetch-site': 'cross-site' })), false,
+    'a cross-site request without Origin is still refused');
+  assert.equal(isTrustedLocalRequest(req({ 'sec-fetch-site': 'same-site' })), false,
+    'same-site without Origin is another local authority, not the shell');
+  assert.equal(isTrustedLocalRequest({ socket: { remoteAddress: '127.0.0.1' }, headers: { host: 'evil.com' } }), false,
+    'the bare shape does not bypass the loopback Host check');
+});
+
 test('the app-scheme allowance stays narrow', () => {
-  // Another app-scheme host is NOT the shell.
-  assert.equal(isTrustedLocalRequest(req({ origin: 'dsh-app://evil', 'sec-fetch-site': 'same-origin' })), false);
-  // Opaque/sandboxed origin (file://, sandboxed iframe) — refused, and this is
-  // exactly why the rule is not "any non-http origin".
-  assert.equal(isTrustedLocalRequest(req({ origin: 'null', 'sec-fetch-site': 'same-origin' })), false);
-  // Another local service's page: same-site but a different authority.
-  assert.equal(isTrustedLocalRequest(req({ origin: 'http://127.0.0.1:9999', 'sec-fetch-site': 'same-site' })), false);
-  // Cross-site wins over everything, app scheme included.
-  assert.equal(isTrustedLocalRequest(req({ origin: 'dsh-app://app', 'sec-fetch-site': 'cross-site' })), false);
-  assert.equal(isTrustedLocalRequest(req({ origin: `http://${HOST}`, 'sec-fetch-site': 'cross-site' })), false);
+  const home = mkdtempSync(join(tmpdir(), 'guard-narrow-'));
+  try {
+    // Another app-scheme host is NOT the shell.
+    assert.equal(isTrustedLocalRequest(req({ origin: 'dsh-app://evil', 'sec-fetch-site': 'same-origin' }), { home }), false);
+    // Opaque/sandboxed origin (file://, sandboxed iframe) — refused, and this is
+    // exactly why the rule is not "any non-http origin".
+    assert.equal(isTrustedLocalRequest(req({ origin: 'null', 'sec-fetch-site': 'same-origin' }), { home }), false);
+    // Another local service's page: same-site but a different authority.
+    assert.equal(isTrustedLocalRequest(req({ origin: 'http://127.0.0.1:9999', 'sec-fetch-site': 'same-site' }), { home }), false);
+    // Cross-site wins over everything, app scheme included.
+    assert.equal(isTrustedLocalRequest(req({ origin: 'dsh-app://app', 'sec-fetch-site': 'cross-site' }), { home }), false);
+    assert.equal(isTrustedLocalRequest(req({ origin: `http://${HOST}`, 'sec-fetch-site': 'cross-site' }), { home }), false);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
 });
 
 test('the fence itself is unchanged: loopback socket + loopback Host required', () => {
-  assert.equal(isTrustedLocalRequest(req({ origin: 'dsh-app://app' }, '8.8.8.8')), false, 'non-loopback peer');
-  assert.equal(isTrustedLocalRequest({ socket: { remoteAddress: '127.0.0.1' }, headers: { host: 'evil.com', origin: 'dsh-app://app' } }), false, 'non-loopback Host');
-  assert.equal(isTrustedLocalRequest({ socket: { remoteAddress: '127.0.0.1' }, headers: { origin: 'dsh-app://app' } }), false, 'missing Host');
+  const home = mkdtempSync(join(tmpdir(), 'guard-fence-'));
+  try {
+    assert.equal(isTrustedLocalRequest(req({ origin: 'dsh-app://app' }, '8.8.8.8'), { home }), false, 'non-loopback peer');
+    assert.equal(isTrustedLocalRequest({ socket: { remoteAddress: '127.0.0.1' }, headers: { host: 'evil.com', origin: 'dsh-app://app' } }, { home }), false, 'non-loopback Host');
+    assert.equal(isTrustedLocalRequest({ socket: { remoteAddress: '127.0.0.1' }, headers: { origin: 'dsh-app://app' } }, { home }), false, 'missing Host');
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
 });
 
 test('a refusal is recorded with the three headers that decide it (and no token)', () => {

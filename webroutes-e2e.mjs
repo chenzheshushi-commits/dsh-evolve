@@ -125,6 +125,31 @@ await store.remember({ content: '一条待确认记忆', kind: 'note', importanc
   console.log('OK desktop origin fence: other app host / null / other authority refused');
 }
 
+// The desktop shell's own proxy deletes Origin, Host, Cookie and Sec-Fetch-Site
+// before forwarding to the Host (apps/desktop/src/web-document.ts
+// forwardWebRequest), so the REAL settings writes from the app arrive with
+// neither header. v0.8.3 required Sec-Fetch-Site in this shape and refused every
+// save with 403; the route must accept it on a loopback socket + loopback Host.
+{
+  const req = mockReq({ method: 'POST', body: { action: 'set-config', idleMinutes: 8 }, headers: {} });
+  delete req.headers.origin;
+  delete req.headers['sec-fetch-site'];
+  const res = mockRes();
+  await R['/api/evolve/action'].handler(req, res);
+  assert.equal(res.statusCode, 200, 'no Origin + no Sec-Fetch-Site -> 200 (desktop shell proxy)');
+  assert.equal(cfg.idleMinutes, 8, 'the write reached the live config');
+  console.log('OK desktop proxy: header-less loopback write accepted');
+}
+{
+  const req = mockReq({ method: 'POST', body: { action: 'set-config', idleMinutes: 9 }, headers: { 'sec-fetch-site': 'cross-site' } });
+  delete req.headers.origin;
+  const res = mockRes();
+  await R['/api/evolve/action'].handler(req, res);
+  assert.equal(res.statusCode, 403, 'a cross-site request without Origin is still refused');
+  assert.equal(cfg.idleMinutes, 8, 'refused write did not touch the config');
+  console.log('OK desktop proxy fence: cross-site without Origin refused');
+}
+
 // POST /action set-config (pick a model + turn refine off)
 {
   const res = mockRes();
