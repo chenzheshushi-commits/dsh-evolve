@@ -61,6 +61,8 @@ interface EvolveState {
     skillProposalMode: 'inherit'|'manual'|'balanced'|'autonomous'; skillAutoMaxChars:number; skillMaxChars:number
     language: 'follow-host' | 'en' | 'zh'
     approvalPromptEnabled:boolean; approvalPromptMaxPerTurn:number
+    /** v0.8.5 memory-history retention caps (snapshots, bytes). */
+    memoryHistoryMaxSnapshots: number; memoryHistoryMaxBytes: number
   }
   models: ModelRow[]
   memoryStats: {
@@ -168,6 +170,12 @@ const btnPrimary: React.CSSProperties = { ...btn, background: 'var(--dsh-accent,
 const mono: React.CSSProperties = { fontFamily: 'ui-monospace, monospace', fontSize: 12 }
 const dim: React.CSSProperties = { opacity: 0.7, fontSize: 13 }
 const btnTiny: React.CSSProperties = { ...btn, padding: '2px 8px', fontSize: 11, marginRight: 0 }
+
+/** Human size for the retention line: KB below 1 MB, one decimal above. */
+function formatSize(bytes: number): string {
+  const n = Number(bytes) || 0
+  return n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`
+}
 
 interface OwnerProps { close: () => void }
 
@@ -914,10 +922,33 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
           {history && history.snapshots.length > 0
             ? t('ui.history.readiness', {
               count: history.snapshots.length,
+              size: formatSize(history.totalBytes),
               when: history.snapshots[0]?.takenAt ? new Date(history.snapshots[0].takenAt).toLocaleString() : '—',
             })
             : t('ui.history.readinessEmpty')}
         </div>
+        {/* Retention is adjustable here: the caps are the answer to "does this grow
+            forever?", so they must be visible and changeable next to the list. */}
+        <div style={{ ...dim, fontSize: 12, marginTop: 6 }}>
+          {t('ui.history.limitsLabel')}{' '}
+          <input
+            type="number" min={2} max={200}
+            style={{ width: 68, padding: '2px 4px' }}
+            value={cfg?.memoryHistoryMaxSnapshots ?? 40}
+            disabled={saving || !cfg}
+            onChange={(e) => void setConfig({ memoryHistoryMaxSnapshots: Number(e.target.value) })}
+          />{' '}
+          {t('ui.history.limitSnapshotsSuffix')}{' '}
+          <input
+            type="number" min={1} max={256}
+            style={{ width: 68, padding: '2px 4px' }}
+            value={Math.round((cfg?.memoryHistoryMaxBytes ?? 8388608) / 1048576)}
+            disabled={saving || !cfg}
+            onChange={(e) => void setConfig({ memoryHistoryMaxBytes: Number(e.target.value) * 1048576 })}
+          />{' '}
+          {t('ui.history.limitBytesSuffix')}
+        </div>
+        <div style={{ ...dim, fontSize: 11, marginTop: 2 }}>{t('ui.history.cleanupHint')}</div>
         {history?.snapshots && history.snapshots.length > 0 ? (
           <table style={{ width: '100%', marginTop: 8, ...mono }}>
             <tbody>

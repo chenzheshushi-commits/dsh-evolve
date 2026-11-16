@@ -120,6 +120,35 @@ test('the size cap prunes oldest-first but never to zero', () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('the retention caps are adjustable, and lowering one prunes immediately', () => {
+  // The user's question was "does this grow forever?" -- so the caps have to be
+  // visible, changeable, and effective without waiting for the next write.
+  const root = mkdtempSync(join(tmpdir(), 'memhist-limits-'));
+  try {
+    const history = makeHistory(root, { maxSnapshots: 10 });
+    const ids = [];
+    for (let i = 0; i < 5; i += 1) ids.push(history.captureNow([mem('a', { content: `rev ${i}` })]).id);
+    assert.equal(history.list().snapshots.length, 5);
+
+    const lowered = history.setLimits({ maxSnapshots: 2 });
+    assert.equal(lowered.snapshots.length, 2, 'the surplus is deleted now, not on the next write');
+    assert.deepEqual(lowered.snapshots.map((x) => x.id), [ids[4], ids[3]], 'newest survive, oldest go');
+    assert.equal(readdirSync(join(root, 'memory-history')).filter((n) => SNAPSHOT_ID_RE.test(n.replace('.json', ''))).length, 2,
+      'and the FILES are gone, not just unlisted');
+
+    // Raising it again does not resurrect anything, it just stops pruning.
+    assert.equal(history.setLimits({ maxSnapshots: 40 }).snapshots.length, 2);
+    // Junk values leave the active cap alone.
+    assert.equal(history.setLimits({ maxSnapshots: 0, maxTotalBytes: -1 }).snapshots.length, 2);
+    assert.equal(history.setLimits({}).snapshots.length, 2);
+    // The byte cap is enforced by the same call.
+    const bytes = history.list().snapshots[0].bytes;
+    const tight = history.setLimits({ maxTotalBytes: Math.max(1024, bytes + 10) });
+    assert.equal(tight.snapshots.length, 1, 'a byte cap below two snapshots keeps only the newest');
+    assert.ok(tight.totalBytes <= Math.max(1024, bytes + 10));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('a diff speaks in content and state, not in usage telemetry', () => {
   const root = mkdtempSync(join(tmpdir(), 'memhist-diff-'));
   try {

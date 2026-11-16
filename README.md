@@ -39,7 +39,7 @@ dsh plugin --profile web add github:chenzheshushi-commits/dsh-evolve
 Pin a specific release instead of tracking `main`:
 
 ```bash
-dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.8.4/dsh-evolve-0.8.4.tgz"
+dsh plugin --profile web add "https://github.com/chenzheshushi-commits/dsh-evolve/releases/download/v0.8.5/dsh-evolve-0.8.5.tgz"
 ```
 
 Then restart the harness — tools are discovered at startup, not hot-reloaded.
@@ -84,6 +84,14 @@ see exactly what restoring it would change, then restore.
   with git the checkpoint only versioned `MEMORY.md` — a mirror no code reads back.
 - **A restore is reversible.** The current state is snapshotted before anything changes, so the
   restore you regret is itself a restore away.
+- **Bounded, and the bounds are yours.** Two retention caps apply: at most
+  `memoryHistoryMaxSnapshots` snapshots (default **40**) and `memoryHistoryMaxBytes` in total
+  (default **8388608** = 8 MB). When either cap is hit, the oldest snapshot files are deleted
+  first — the newest one is always kept, so the ring can never prune itself to nothing — and an
+  unchanged memory table never writes a second snapshot. Both caps sit on the settings page next
+  to the list, and **lowering one deletes the surplus immediately** rather than at the next write.
+  Real sizes: ~111 KB per snapshot for a 62-record table (40 snapshots ≈ 4.3 MB), ~706 KB at the
+  400-record governance limit (so the byte cap binds first, at ~11 snapshots).
 - **Nothing is physically deleted.** Records created after the chosen snapshot get the same
   soft-delete tombstone `tidy` writes: they leave recall and injection, and stay recoverable.
 - **Content and state come back; usage telemetry does not.** Recall/injection heat, observation
@@ -197,6 +205,8 @@ Notable switches:
 | `convergeSuggest` | `true` | Surface merge/fold suggestions |
 | `curatorStaleDays` / `curatorArchiveDays` | `30` / `60` | Skill lifecycle thresholds |
 | `ftsEnabled` | `true` | `false` = pure bigram recall, no SQLite |
+| `memoryHistoryMaxSnapshots` | `40` | How many memory snapshots the rollback ring keeps (2–200) |
+| `memoryHistoryMaxBytes` | `8388608` | Total size cap for the ring, in bytes (8 MB); oldest snapshots are pruned first |
 
 The LLM is only ever used for optional auxiliary passes — skill refinement, background review,
 and skill merging. All of them are single-shot, skippable, and fall back to deterministic
@@ -213,6 +223,36 @@ behavior on failure. Nothing runs in your main loop.
 - **Mechanisms over model smarts.** Safety comes from deterministic rules, so swapping models changes quality, never safety.
 
 ---
+
+## What's new in v0.8.5 — Memory rollback works without git (and restores records)
+
+Rollback used to be delegated to `git` in the plugin workspace, and `_scheduleCommit()` returns
+immediately when `.git` is absent. On a machine without git on PATH — a default Windows install, a
+slim Linux image, a container — every memory write produced **no history at all**, silently, and
+the settings page said nothing. Identical on the web profile and the desktop app, because the code
+runs on the host. Even with git it was not a rollback: the checkpoint committed `MEMORY.md` (a
+human-readable mirror) while the truth store lives outside that repository, and no code reads the
+mirror back.
+
+The plugin now keeps its own snapshots:
+
+- `$DSH_HOME/evolve-workspace/memory-history/` — one complete, restorable JSON snapshot per change
+  (2 s debounce, content-deduped, atomic writes, captured once at boot, gitignored).
+- Settings page → **Memory history and rollback**: list, preview the exact diff, restore.
+- A restore puts content and state back, keeps live usage counters (reverting heat would make a
+  just-used memory look cold, and `tidy` disposes what looks cold), soft-deletes records created
+  after the snapshot instead of removing them, snapshots the current state first (so the restore is
+  itself reversible), and refuses with a fresh diff if memories changed between the preview and the
+  click. Applies are human-only and bound to the snapshot's own bytes.
+- Retention is bounded: oldest deleted first, newest always kept, both caps adjustable below.
+- Fixed alongside: a degraded mount resolved to `false`, which cordis reports as
+  `TypeError: Invalid effect` and which therefore buried the real cause (storage domain open
+  failed) — now it resolves to `undefined` and the persisted log is the only signal.
+
+| Key | Default | Effect |
+|---|---|---|
+| `memoryHistoryMaxSnapshots` | `40` | Snapshots kept by the rollback ring (2–200); oldest pruned first |
+| `memoryHistoryMaxBytes` | `8388608` | Total size cap in bytes (1 MB–256 MB); lowering it prunes immediately |
 
 ## What's new in v0.8.4 — The desktop settings page can save again
 
