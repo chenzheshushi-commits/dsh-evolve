@@ -113,6 +113,11 @@ assert.ok(registered.routes.includes('/api/evolve/quarantine'), 'quarantine list
 assert.ok(registered.routes.includes('/api/evolve/quarantine/'), 'quarantine action route registered');
 assert.ok(registered.routes.includes('/api/evolve/memory/discard'));
 assert.ok(registered.routes.includes('/api/evolve/memory/restore-rejected'));
+// v0.8.5 memory history: rollback without git, so these must be wired whenever
+// the web control plane is.
+assert.ok(registered.routes.includes('/api/evolve/memory/history'), 'history list route registered');
+assert.ok(registered.routes.includes('/api/evolve/memory/history/preview'), 'history diff route registered');
+assert.ok(registered.routes.includes('/api/evolve/memory/history/restore'), 'history restore route registered');
 // v0.6.0 skill operations + operator resolution.
 assert.ok(registered.routes.includes('/api/evolve/skills/archives'), 'archive list route registered');
 assert.ok(registered.routes.includes('/api/evolve/skills/'), 'skill ops action route registered');
@@ -126,6 +131,9 @@ assert.deepEqual([...registered.routes].sort(), [
   '/api/evolve/action',
   '/api/evolve/capability/mint',
   '/api/evolve/memory/discard',
+  '/api/evolve/memory/history',
+  '/api/evolve/memory/history/preview',
+  '/api/evolve/memory/history/restore',
   '/api/evolve/memory/restore-rejected',
   '/api/evolve/operations',
   '/api/evolve/operations/',

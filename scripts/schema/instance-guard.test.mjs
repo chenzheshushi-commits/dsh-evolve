@@ -131,7 +131,11 @@ test('a failed first mount releases ownership instead of leaving the plugin dead
       logger: { warn: () => {} },
       effect: () => {},
     };
-    await apply(broken, {});
+    const outcome = await apply(broken, {});
+    // cordis wraps apply() in an effect: a thenable resolving to a non-disposer
+    // throws `TypeError: Invalid effect`, which hides the actual cause. A degraded
+    // mount must resolve to undefined and leave the log as the only signal.
+    assert.equal(outcome, undefined, 'a degraded mount must not resolve to false (cordis: Invalid effect)');
     assert.equal(existsSync(join(workspace(), 'last-apply-error.log')), true,
       'the first mount must persist its own failure instead of failing silently');
 

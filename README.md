@@ -18,9 +18,9 @@ mechanisms and rules. Everything it learns is local to your install and never le
 |---|---|
 | **Node.js >= 22.5.0** | Uses the built-in `node:sqlite` module for FTS5 full-text search. Node 20 will not work. |
 | **DeepSeek Harness** `0.1.0-rc.7`+ | Host platform. Provides tools, storage, LLM, and (optionally) the web server. |
-| `git` on PATH *(optional)* | Enables automatic memory checkpoints you can roll back. Without it, checkpoints are skipped. |
+| `git` on PATH *(optional)* | Adds an extra commit history of `MEMORY.md` inside the plugin workspace. **Not needed for rollback**: the plugin keeps its own restorable memory snapshots (see [Memory history and rollback](#memory-history-and-rollback-no-git-no-external-tools)). |
 | `tar` on PATH | Required for skill rewrites that need a rollback snapshot. A failed backup aborts refine/fold instead of risking an unrecoverable overwrite. |
-| Linux / macOS / Windows | Developed on Linux; CI runs the full suite on Linux **and** Windows. Windows needs `git`/`tar` on PATH for the optional checkpoint and rollback features — the plugin skips them rather than failing when they are absent. (v0.6.0 and earlier threw `EPERM` on Windows the moment a skill proposal was written; fixed in v0.6.1.) |
+| Linux / macOS / Windows | Developed on Linux; CI runs the full suite on Linux **and** Windows. Skill rewrites need `tar` on PATH (a failed backup aborts the rewrite rather than risking an overwrite); memory rollback needs nothing beyond the plugin itself. (v0.6.0 and earlier threw `EPERM` on Windows the moment a skill proposal was written; fixed in v0.6.1.) |
 
 Degradation is graceful by design: if SQLite/FTS5 is unavailable the plugin falls back to
 pure bigram recall, and any optional dependency that's missing disables only its own feature.
@@ -69,6 +69,32 @@ tokenized correctly (searching 苹果 does not match 水果).
 
 Relevant memories inject automatically each step based on the current message, and durable
 user preferences/facts inject as an always-on snapshot at the start of every turn.
+
+### Memory history and rollback (no git, no external tools)
+
+Every change to the memory table writes a complete, restorable snapshot to
+`$DSH_HOME/evolve-workspace/memory-history/` (gitignored, newest 40, capped at 8 MB, so the ring
+prunes itself). The settings page lists them as **Memory history and rollback**: pick a moment,
+see exactly what restoring it would change, then restore.
+
+- **Nothing external is required.** Snapshots are plain JSON written by the plugin. A Windows
+  install without Git for Windows, a slim Linux image, a container — all get the same behaviour.
+  Before v0.8.5 rollback was delegated to `git` in the workspace, and `_scheduleCommit()` returns
+  immediately when `.git` is absent: on those machines rollback did not exist, silently, and even
+  with git the checkpoint only versioned `MEMORY.md` — a mirror no code reads back.
+- **A restore is reversible.** The current state is snapshotted before anything changes, so the
+  restore you regret is itself a restore away.
+- **Nothing is physically deleted.** Records created after the chosen snapshot get the same
+  soft-delete tombstone `tidy` writes: they leave recall and injection, and stay recoverable.
+- **Content and state come back; usage telemetry does not.** Recall/injection heat, observation
+  counts and write provenance keep their live values — reverting heat would make a memory used
+  five minutes ago look cold, and `tidy` disposes what looks cold.
+- **A stale panel cannot blind-side you.** The preview's retire count is sent back with the
+  restore; if memories changed in between, the request is refused with a freshly computed diff
+  instead of tombstoning records you never saw.
+- **Restores are human-only and capability-gated.** No model tool can restore memory; the action
+  is bound to the snapshot's own bytes (a snapshot edited on disk cannot authorize the restore of
+  different content) and a one-time token is spent on the attempt.
 
 ### Tiered approval, not "confirm everything"
 Model-written memories pass through a deterministic gate that decides **auto-confirm vs. hold

@@ -105,6 +105,31 @@ interface SkillArchive {
   archivedAt?: string
 }
 
+/**
+ * Native memory history (v0.8.5). Snapshots are the plugin's own files, not git:
+ * on a machine without git the old checkpoint path wrote nothing at all, and even
+ * with git it only versioned MEMORY.md -- a mirror no code reads back.
+ */
+interface HistorySnapshot { id: string; takenAt: string | null; count: number; bytes: number }
+interface HistoryList {
+  ok: boolean
+  enabled: boolean
+  snapshots: HistorySnapshot[]
+  latestAt: string | null
+  totalBytes: number
+  currentCount: number
+  limits: { maxSnapshots: number; maxBytes: number; dir: string | null }
+}
+interface HistorySample { id: string; kind: string; content: string; before?: string }
+interface HistoryDiff {
+  ok: boolean
+  status?: string
+  error?: string
+  snapshot: { id: string; takenAt: string; count: number; sha256: string }
+  counts: { added: number; removed: number; changed: number; wouldRetire: number }
+  samples: { added: HistorySample[]; removed: HistorySample[]; changed: HistorySample[] }
+}
+
 async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(path)
   if (!res.ok) throw new Error(`${path} -> ${res.status}`)
@@ -118,6 +143,23 @@ async function apiPost<T>(path: string, body: unknown): Promise<T> {
   })
   if (!res.ok) throw new Error(`${path} -> ${res.status}`)
   return (await res.json()) as T
+}
+/**
+ * Same POST, but keeps the JSON body of a failed response.
+ *
+ * The restore route answers 409 with a FRESH diff when memories changed between
+ * the preview and the click. Refusing silently would leave the operator staring at
+ * stale counts, so the panel needs that body.
+ */
+async function apiPostDetailed<T>(path: string, body: unknown): Promise<{ ok: boolean; status: number; data: T | null }> {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  let data: T | null = null
+  try { data = (await res.json()) as T } catch { data = null }
+  return { ok: res.ok, status: res.status, data }
 }
 
 const box: React.CSSProperties = { border: '1px solid var(--dsh-border, #333)', borderRadius: 8, padding: 12, marginBottom: 12 }
@@ -348,6 +390,60 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
       await refreshPrune(); await refresh()
     } catch (e) { setNote(String(e)) } finally { setSaving(false) }
   }, [refreshPrune, refresh, t])
+
+  // ── v0.8.5 memory history (native snapshots; no git required) ──
+  const [history, setHistory] = useState<HistoryList | null>(null)
+  const [histDiff, setHistDiff] = useState<HistoryDiff | null>(null)
+  const loadHistory = useCallback(async () => {
+    try { setHistory(await apiGet<HistoryList>(`${API}/memory/history`)) } catch { /* advisory panel */ }
+  }, [])
+  useEffect(() => {
+    void loadHistory()
+    const iv = window.setInterval(() => { void loadHistory() }, 20000)
+    return () => window.clearInterval(iv)
+  }, [loadHistory])
+
+  const previewSnapshot = useCallback(async (id: string) => {
+    setSaving(true); setNote('')
+    try {
+      const r = await apiPostDetailed<HistoryDiff>(`${API}/memory/history/preview`, { snapshotId: id })
+      if (!r.ok || !r.data?.ok) { setNote(`❌ ${r.data?.error ?? r.status}`); return }
+      setHistDiff(r.data)
+    } catch (e) { setNote(String(e)) } finally { setSaving(false) }
+  }, [])
+
+  const restoreSnapshot = useCallback(async () => {
+    if (!histDiff) return
+    const snapshotId = histDiff.snapshot.id
+    setSaving(true); setNote('')
+    try {
+      // The capability is bound server-side to the snapshot's own bytes.
+      const cap = await apiPost<{ capId: string }>(`${API}/capability/mint`, {
+        purpose: 'memory-restore-snapshot', target: { snapshotId },
+      })
+      const r = await apiPostDetailed<HistoryDiff & { restored: number; retired: number; revived: number; preSnapshotId: string | null }>(
+        `${API}/memory/history/restore`,
+        { snapshotId, capId: cap.capId, opId: `memrestore_${Date.now().toString(36)}`, expectedRetired: histDiff.counts.wouldRetire },
+      )
+      if (!r.ok || !r.data) {
+        // 409 + a fresh diff: memories changed after the preview. Show the new
+        // numbers instead of an opaque failure.
+        if (r.status === 409 && r.data && (r.data as HistoryDiff).counts) {
+          setHistDiff(r.data as HistoryDiff)
+          setNote(t('ui.history.stale'))
+        } else setNote(`❌ ${r.data?.error ?? r.status}`)
+        await loadHistory()
+        return
+      }
+      const d = r.data
+      setNote(t('ui.note.historyRestored', {
+        snapshot: snapshotId, restored: d.restored, retired: d.retired, revived: d.revived,
+        pre: d.preSnapshotId ?? '—',
+      }))
+      setHistDiff(null)
+      await loadHistory(); await refresh()
+    } catch (e) { setNote(String(e)) } finally { setSaving(false) }
+  }, [histDiff, loadHistory, refresh, t])
 
   const s = state
   const cfg = s?.config
@@ -807,6 +903,81 @@ export function EvolveSettingsSection(_props: OwnerProps): React.ReactElement {
               </div>
             ))}
           </div>
+        ) : null}
+      </div>
+
+      {/* ── Block 2.6: memory history and rollback (v0.8.5) ── */}
+      <div style={box}>
+        <b>{t('ui.history.title')}</b>
+        <div style={dim}>{t('ui.history.desc')}</div>
+        <div style={{ ...mono, marginTop: 8 }}>
+          {history && history.snapshots.length > 0
+            ? t('ui.history.readiness', {
+              count: history.snapshots.length,
+              when: history.snapshots[0]?.takenAt ? new Date(history.snapshots[0].takenAt).toLocaleString() : '—',
+            })
+            : t('ui.history.readinessEmpty')}
+        </div>
+        {history?.snapshots && history.snapshots.length > 0 ? (
+          <table style={{ width: '100%', marginTop: 8, ...mono }}>
+            <tbody>
+              {history.snapshots.map((snap) => (
+                <tr key={snap.id} style={{ verticalAlign: 'top' }}>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    {snap.takenAt ? new Date(snap.takenAt).toLocaleString() : snap.id}
+                  </td>
+                  <td style={{ paddingLeft: 8, opacity: 0.7 }}>{snap.count}</td>
+                  <td style={{ paddingLeft: 8, opacity: 0.7 }}>{Math.max(1, Math.round(snap.bytes / 1024))} KB</td>
+                  <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
+                    <button style={btnTiny} disabled={saving} onClick={() => void previewSnapshot(snap.id)}>
+                      {t('ui.history.preview')}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : null}
+        {histDiff ? (
+          <div style={{ border: '1px dashed var(--dsh-border,#555)', borderRadius: 6, padding: 8, marginTop: 10 }}>
+            <div style={{ fontWeight: 600 }}>{t('ui.history.previewTitle')}</div>
+            <div style={{ ...dim, fontSize: 12, marginTop: 2 }}>
+              {histDiff.snapshot.takenAt ? new Date(histDiff.snapshot.takenAt).toLocaleString() : histDiff.snapshot.id}
+            </div>
+            <table style={{ width: '100%', marginTop: 6, ...mono }}>
+              <tbody>
+                <tr><td>{t('ui.history.added', { count: histDiff.counts.added })}</td></tr>
+                <tr><td>{t('ui.history.removed', { count: histDiff.counts.removed })}</td></tr>
+                <tr><td>{t('ui.history.changed', { count: histDiff.counts.changed })}</td></tr>
+              </tbody>
+            </table>
+            {histDiff.samples.added.length + histDiff.samples.removed.length + histDiff.samples.changed.length > 0 ? (
+              <div style={{ ...mono, marginTop: 6, maxHeight: 180, overflowY: 'auto' }}>
+                {histDiff.samples.added.map((x) => (
+                  <div key={`a-${x.id}`} style={{ color: '#b45309' }}>+ [{x.kind}] {x.content}</div>
+                ))}
+                {histDiff.samples.removed.map((x) => (
+                  <div key={`r-${x.id}`} style={{ color: '#16a34a' }}>− [{x.kind}] {x.content}</div>
+                ))}
+                {histDiff.samples.changed.map((x) => (
+                  <div key={`c-${x.id}`} style={{ opacity: 0.85 }}>~ [{x.kind}] {x.before} → {x.content}</div>
+                ))}
+              </div>
+            ) : null}
+            <div style={{ ...dim, fontSize: 12, marginTop: 6 }}>{t('ui.history.unchangedHint')}</div>
+            <div style={{ ...dim, fontSize: 12, marginTop: 2 }}>{t('ui.history.reversible')}</div>
+            <div style={{ marginTop: 8 }}>
+              <button style={btnPrimary} disabled={saving} onClick={() => void restoreSnapshot()}>
+                {t('ui.history.restoreBtn')}
+              </button>
+              <button style={btn} disabled={saving} onClick={() => setHistDiff(null)}>
+                {t('ui.common.cancel')}
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {history?.limits?.dir ? (
+          <div style={{ ...dim, fontSize: 11, marginTop: 8 }}>{t('ui.history.dirHint', { dir: history.limits.dir })}</div>
         ) : null}
       </div>
 

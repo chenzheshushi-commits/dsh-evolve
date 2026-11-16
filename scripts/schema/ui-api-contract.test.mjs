@@ -104,6 +104,34 @@ test('resolution sends back the conflict hash it displayed', () => {
     'the request body must echo the hash the operator saw');
 });
 
+test('the memory-history panel is wired to routes that actually exist', () => {
+  // v0.8.5: rollback must not depend on git, so the panel and these three routes
+  // are the feature. A missing route or an unwired button compiles fine and fails
+  // in front of the user, which is exactly what this file exists to catch.
+  assert.match(client, /记忆历史与回滚/, 'the history panel must ship in the bundle');
+  const paths = clientPaths();
+  for (const p of ['memory/history', 'memory/history/preview', 'memory/history/restore']) {
+    assert.ok([...paths].some((x) => x.startsWith(p)), `the client must call ${p}`);
+  }
+  const served = [...routes.matchAll(/EVOLVE_API_PREFIX\}\/([a-z0-9/\-]*)`/gi)].map((m) => m[1]);
+  for (const p of ['memory/history', 'memory/history/preview', 'memory/history/restore']) {
+    // Exact, not prefix: prefix routes answer a bare 401 on POST from the outer layer.
+    assert.ok(served.includes(p), `${p} must be served exactly (served: ${served.sort().join(', ')})`);
+  }
+  // The restore call must carry the capability, the op id, and the retire count it
+  // previewed -- the server refuses a stale one rather than tombstoning unseen records.
+  const idx = client.indexOf('/memory/history/restore');
+  assert.ok(idx > 0);
+  const callIdx = client.lastIndexOf('apiPostDetailed', idx);
+  assert.ok(callIdx > -1, 'the restore must go through the detailed POST (it needs the 409 diff body)');
+  const statement = enclosingStatement(client, callIdx);
+  for (const field of ['capId', 'opId', 'expectedRetired']) {
+    assert.match(statement, new RegExp(field), `the restore request must send ${field}`);
+  }
+  // And no direct, capability-free restore endpoint may exist at the tool layer.
+  assert.equal(/memory_restore\b/i.test(client), false, 'the client must not invent a model-facing memory_restore');
+});
+
 test('the rollback button proposes rather than rolls back', () => {
   const idx = client.indexOf('rollback-proposal-create');
   assert.ok(idx > 0, 'the client must mint the proposal-create purpose');

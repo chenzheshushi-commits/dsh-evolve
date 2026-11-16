@@ -10,13 +10,20 @@ const ws = mkdtempSync(join(tmpdir(), 'evolve-webroutes-'));
 process.env.DSH_HOME = ws;
 
 const { MemoryStore } = await import('./lib/store.js');
+const { MemoryHistory } = await import('./lib/memory-history.js');
 const { makeEvolveRoutes } = await import('./lib/web-routes.js');
+const { CapabilityStore } = await import('./lib/capabilities.js');
 
 function makeTable() {
   const m = new Map();
   return {
     put(k, v) { m.set(k, v); return true; }, get(k) { return m.get(k); },
     delete(k) { return m.delete(k); }, entries() { return [...m.entries()]; },
+    update(k, fn) {
+      const cur = m.get(k);
+      if (!cur) { const e = new Error('missing-key'); e.code = 'missing-key'; throw e; }
+      m.set(k, fn(cur));
+    },
     get size() { return m.size; },
   };
 }
@@ -46,7 +53,14 @@ const cfg = {
   maxRecords: 400, maxContentChars: 2000, mergeSimilarity: 0.7,
   recencyHalfLifeDays: 90, recallLimit: 5, injectCount: 3, injectMaxChars: 1200,
 };
-const store = new MemoryStore(makeTable(), { workspaceDir: ws, config: cfg, logger: { warn() {}, info() {} } });
+let histTick = 0;
+// v0.8.5: native history, so these routes are exercised the way an install
+// without git runs them (the plugin's own files, no external binary).
+const history = new MemoryHistory({
+  workspaceDir: ws, debounceMs: 0, logger: { warn() {}, info() {} },
+  now: () => Date.now() + (histTick += 1),
+});
+const store = new MemoryStore(makeTable(), { workspaceDir: ws, config: cfg, history, logger: { warn() {}, info() {} } });
 
 // mock llm service for the models list (passed as a value, not via ctx)
 const llm = { listProviders: () => [{ id: 'p1' }], listModels: async () => [{ id: 'm1' }, { id: 'm2' }] };
@@ -64,6 +78,13 @@ const deps = {
   skillStates: () => ({ counts: { active: 0, stale: 0, archived: 0 }, triage: { disabled: true } }),
   getSuggestedDisposal: () => ({ candidates: store.disposalCandidates(), computedAt: Date.now(), mode: cfg.disposalMode }),
   listUnclaimed: () => unclaimedFixture,
+  memoryHistory: history,
+  capabilityService: {
+    mint: (purpose, target) => capabilities.mint({ purpose, target, sessionKey: 'same-origin-session', fetchSite: 'same-origin' }),
+    consume: (capId, purpose, target, opId) => capabilities.consume({
+      capId, purpose, target, sessionKey: 'same-origin-session', fetchSite: 'same-origin', opId,
+    }),
+  },
   claimLegacy: (name) => {
     const i = unclaimedFixture.findIndex((k) => k.name === name)
     if (i < 0) return { claimed: false, reason: 'not unclaimed' }
@@ -71,6 +92,7 @@ const deps = {
     return { claimed: true, name }
   },
 };
+const capabilities = new CapabilityStore();
 const routes = makeEvolveRoutes(deps);
 const R = routeMap(routes);
 assert.ok(R['/api/evolve/state'] && R['/api/evolve/action'], 'both routes present');
@@ -410,6 +432,96 @@ await store.remember({ content: '一条待确认记忆', kind: 'note', importanc
   assert.match(text, /reject=origin-host-mismatch/, 'and the reason');
   assert.doesNotMatch(text, /token=/i, 'never a token');
   console.log('OK web guard: the refusal log lands in the injected home');
+}
+
+// ── v0.8.5 memory history / rollback, end to end ─────────────────────────────
+// The defect: with no git on PATH the old checkpoint path wrote no history at
+// all, silently, so rollback simply did not exist. These routes must work with
+// the plugin's own snapshots -- and the restore must be capability-gated,
+// stale-checked, and reversible.
+{
+  history.captureNow(store.all());
+  const before = history.latest();
+  assert.ok(before, 'a snapshot exists without git');
+
+  const listRes = mockRes();
+  await R['/api/evolve/memory/history'].handler(mockReq({ method: 'GET' }), listRes);
+  assert.equal(listRes.statusCode, 200, 'GET /memory/history -> 200');
+  const listed = JSON.parse(listRes.body);
+  assert.equal(listed.ok, true);
+  assert.ok(listed.snapshots.length >= 1, 'the listing carries snapshots');
+  assert.ok(listed.currentCount >= 1, 'and the live record count');
+  assert.equal(typeof listed.limits.dir, 'string', 'the panel can tell the user where the files are');
+  console.log(`OK memory history: ${listed.snapshots.length} snapshot(s), ${listed.currentCount} live record(s), no git needed`);
+
+  // Refusals: not a loopback origin, and a restore with no capability.
+  const liveCountBefore = store.all().length;
+  {
+    const req = mockReq({ method: 'POST', body: { snapshotId: before.id }, headers: { 'sec-fetch-site': 'cross-site' } });
+    delete req.headers.origin;
+    const r = mockRes();
+    await R['/api/evolve/memory/history/preview'].handler(req, r);
+    assert.equal(r.statusCode, 403, 'cross-site preview refused');
+  }
+  {
+    const r = mockRes();
+    await R['/api/evolve/memory/history/restore'].handler(
+      mockReq({ method: 'POST', body: { snapshotId: before.id, expectedRetired: 0 } }), r);
+    assert.equal(r.statusCode, 401, 'restore without a capability -> 401');
+    assert.equal(store.all().length, liveCountBefore, 'and nothing was restored');
+  }
+
+  // A bad edit plus a newcomer, then preview: the diff must describe both.
+  const seeded = store.all()[0];
+  await store.table.put(seeded.id, { ...seeded, content: 'BAD REWRITE' });
+  const newcomer = await store.remember({ content: 'written after the snapshot', kind: 'note', importance: 1, confirm: true });
+  const pv = mockRes();
+  await R['/api/evolve/memory/history/preview'].handler(
+    mockReq({ method: 'POST', body: { snapshotId: before.id } }), pv);
+  assert.equal(pv.statusCode, 200, 'preview -> 200');
+  const diff = JSON.parse(pv.body);
+  assert.equal(diff.counts.changed, 1, 'the bad rewrite shows as changed');
+  assert.equal(diff.counts.wouldRetire, 1, 'the newcomer shows as retire-on-restore');
+  assert.equal(diff.snapshot.sha256.length, 64, 'the preview pins the snapshot bytes');
+
+  // A stale expectedRetired (what the operator did NOT see) is refused, not applied.
+  const capStale = capabilities.mint({
+    purpose: 'memory-restore-snapshot', target: history.mintTarget(before.id),
+    sessionKey: 'same-origin-session', fetchSite: 'same-origin',
+  });
+  const stale = mockRes();
+  await R['/api/evolve/memory/history/restore'].handler(
+    mockReq({ method: 'POST', body: { snapshotId: before.id, capId: capStale.capId, expectedRetired: 0 } }), stale);
+  assert.equal(stale.statusCode, 409, 'a stale view is refused');
+  assert.equal(JSON.parse(stale.body).status, 'stale');
+  assert.equal(store.all().find((r) => r.id === seeded.id).content, 'BAD REWRITE', 'refusal did not restore anything');
+
+  // The real restore: capability bound to the snapshot, reversible by construction.
+  const cap = capabilities.mint({
+    purpose: 'memory-restore-snapshot', target: history.mintTarget(before.id),
+    sessionKey: 'same-origin-session', fetchSite: 'same-origin',
+  });
+  const okRes = mockRes();
+  await R['/api/evolve/memory/history/restore'].handler(
+    mockReq({ method: 'POST', body: {
+      snapshotId: before.id, capId: cap.capId, opId: 'memrestore_e2e', expectedRetired: diff.counts.wouldRetire,
+    } }), okRes);
+  assert.equal(okRes.statusCode, 200, `restore -> 200 (got ${okRes.statusCode}: ${okRes.body})`);
+  const restored = JSON.parse(okRes.body);
+  assert.equal(restored.restored, 1, 'the rewritten record came back');
+  assert.equal(restored.retired, 1, 'the newcomer was retired');
+  assert.ok(restored.preSnapshotId, 'the pre-restore snapshot id is reported');
+  const live = store.all();
+  assert.equal(live.find((r) => r.id === seeded.id).content, seeded.content, 'content is back to the snapshot');
+  assert.ok(live.find((r) => r.id === newcomer.id).forgottenAt, 'the newcomer is soft-deleted, never removed');
+  assert.ok(history.list().snapshots.some((x) => x.id === restored.preSnapshotId), 'that pre-restore snapshot is really on disk');
+  console.log('OK memory history: preview -> stale-refusal -> capability-gated, reversible restore');
+
+  // A replay of the same capability must be refused (one-time token).
+  const replay = mockRes();
+  await R['/api/evolve/memory/history/restore'].handler(
+    mockReq({ method: 'POST', body: { snapshotId: before.id, capId: cap.capId, opId: 'memrestore_e2e' } }), replay);
+  assert.equal(replay.statusCode, 401, 'a spent capability cannot be replayed');
 }
 
 rmSync(ws, { recursive: true, force: true });
